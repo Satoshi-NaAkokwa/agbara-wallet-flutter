@@ -83,7 +83,7 @@ class _CommunityTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildInfoCard(context, Icons.groups, 'Rotating Savings (ROSCA)',
-            'Pool funds with trusted members. Each round, one member receives the full pot.',
+            'Pool funds with trusted members. Each round, one member receives the full pot. Smart contract enforced.',
             Colors.purple),
           const SizedBox(height: 16),
           ElevatedButton.icon(
@@ -99,79 +99,112 @@ class _CommunityTab extends StatelessWidget {
           const SizedBox(height: 24),
           Text('My Groups', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.groups, color: Colors.purple, size: 20),
-              ),
-              title: const Text('Ejeme Family Savings'),
-              subtitle: const Text('12 members • Round 3 of 12'),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                EjmSymbol(size: 14, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 2),
-                const Text('500', style: TextStyle(fontWeight: FontWeight.bold)),
-              ]),
-            ),
-          ),
+          _EmptyState(icon: Icons.groups, message: 'No active groups\nCreate or join a ROSCA to start saving'),
           const SizedBox(height: 24),
           Text('How ROSCA Works', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          _buildStep(context, '1', 'Create or join a savings group'),
-          _buildStep(context, '2', 'Each member contributes per round'),
-          _buildStep(context, '3', 'One member receives the pot each cycle'),
-          _buildStep(context, '4', 'Smart contract enforces payouts'),
+          _buildStep(context, '1', 'Create or join a savings group with trusted members'),
+          _buildStep(context, '2', 'Each member contributes EJM per round'),
+          _buildStep(context, '3', 'One member receives the pot each cycle via smart contract'),
+          _buildStep(context, '4', 'Continue until all members have received their turn'),
         ],
       ),
     );
   }
 
   void _showCreateRosca(BuildContext ctx) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController();
+    final contribCtrl = TextEditingController();
+    final membersCtrl = TextEditingController();
+    final durationCtrl = TextEditingController();
+
     showModalBottomSheet(context: ctx, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Create ROSCA', style: Theme.of(c).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          const TextField(decoration: InputDecoration(labelText: 'Group Name', prefixIcon: Icon(Icons.edit))),
-          const SizedBox(height: 12),
-          Row(children: [
-            EjmSymbol(size: 24),
-            const SizedBox(width: 8),
-            const Expanded(child: TextField(decoration: InputDecoration(labelText: 'Contribution per round (EJM)'), keyboardType: TextInputType.number)),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Create ROSCA', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name', prefixIcon: Icon(Icons.edit)),
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 12),
+            Row(children: [
+              EjmSymbol(size: 24),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(
+                controller: contribCtrl,
+                decoration: const InputDecoration(labelText: 'Contribution per round (EJM)'),
+                keyboardType: TextInputType.number,
+                validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
+              )),
+            ]),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: membersCtrl,
+              decoration: const InputDecoration(labelText: 'Number of members', prefixIcon: Icon(Icons.people)),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                final n = int.tryParse(v);
+                if (n == null || n < 2 || n > 50) return '2-50 members';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: durationCtrl,
+              decoration: const InputDecoration(labelText: 'Round duration (days)', prefixIcon: Icon(Icons.timer)),
+              keyboardType: TextInputType.number,
+              validator: (v) => v == null || v.isEmpty || int.tryParse(v) == null ? 'Invalid' : null,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('ROSCA created (smart contract integration pending)')));
+              },
+              icon: const Icon(Icons.groups), label: const Text('Create Group'),
+            ),
+            const SizedBox(height: 20),
           ]),
-          const SizedBox(height: 12),
-          const TextField(decoration: InputDecoration(labelText: 'Number of members', prefixIcon: Icon(Icons.people)), keyboardType: TextInputType.number),
-          const SizedBox(height: 12),
-          const TextField(decoration: InputDecoration(labelText: 'Round duration (days)', prefixIcon: Icon(Icons.timer)), keyboardType: TextInputType.number),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () { Navigator.pop(c); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('ROSCA created'))); },
-            icon: const Icon(Icons.groups), label: const Text('Create Group'),
-          ),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
 
   void _showJoinRosca(BuildContext ctx) {
+    final formKey = GlobalKey<FormState>();
+    final codeCtrl = TextEditingController();
+
     showModalBottomSheet(context: ctx,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Join ROSCA', style: Theme.of(c).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          const TextField(decoration: InputDecoration(labelText: 'Group ID or Invite Code', prefixIcon: Icon(Icons.qr_code))),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () { Navigator.pop(c); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Request sent'))); },
-            icon: const Icon(Icons.group_add), label: const Text('Request to Join'),
-          ),
-        ]),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Join ROSCA', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Group ID or Invite Code', prefixIcon: Icon(Icons.qr_code)),
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Join request sent')));
+              },
+              icon: const Icon(Icons.group_add), label: const Text('Request to Join'),
+            ),
+          ]),
+        ),
       ),
     );
   }
@@ -190,7 +223,7 @@ class _CommunityTab extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════
-// GOV/HERALD TAB (Decision Making + P2P Governance)
+// GOV/HERALD TAB
 // ═══════════════════════════════════════════════════════════
 class _GovHeraldTab extends StatelessWidget {
   const _GovHeraldTab();
@@ -203,7 +236,7 @@ class _GovHeraldTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildInfoCard(context, Icons.account_balance, 'Biafran Government in Exile',
-            'On-chain governance for the Biafran diaspora community. Vote on policy, allocate treasury funds, and shape the future of EJM.',
+            'On-chain governance for the Biafran diaspora. Propose, vote, and allocate treasury funds transparently.',
             Colors.green[700]!),
           const SizedBox(height: 16),
           Card(
@@ -216,29 +249,7 @@ class _GovHeraldTab extends StatelessWidget {
                   Text('Active Proposals', style: Theme.of(context).textTheme.titleMedium),
                 ]),
                 const SizedBox(height: 12),
-                _ProposalTile(
-                  title: 'Increase P2P Exchange Fee to 0.15%',
-                  votes: '12,450',
-                  status: 'Voting',
-                  deadline: '3 days',
-                  percent: 0.62,
-                ),
-                const Divider(height: 1),
-                _ProposalTile(
-                  title: 'Allocate 1M EJM for Diaspora Aid Fund',
-                  votes: '89,200',
-                  status: 'Passing',
-                  deadline: '1 day',
-                  percent: 0.78,
-                ),
-                const Divider(height: 1),
-                _ProposalTile(
-                  title: 'Add EUR Proxy Token Support',
-                  votes: '45,100',
-                  status: 'Tied',
-                  deadline: '5 days',
-                  percent: 0.50,
-                ),
+                _EmptyState(icon: Icons.how_to_vote, message: 'No active proposals\nSubmit the first proposal to start governance'),
               ]),
             ),
           ),
@@ -253,11 +264,7 @@ class _GovHeraldTab extends StatelessWidget {
                   Text('Treasury Overview', style: Theme.of(context).textTheme.titleMedium),
                 ]),
                 const SizedBox(height: 12),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                  _TreasuryItem('Balance', '2.4M', 'EJM'),
-                  _TreasuryItem('Monthly Out', '150K', 'EJM'),
-                  _TreasuryItem('Fees Collected', '45K', 'EJM'),
-                ]),
+                _EmptyState(icon: Icons.account_balance_wallet, message: 'Treasury will display here\nwhen governance is active'),
               ]),
             ),
           ),
@@ -270,7 +277,7 @@ class _GovHeraldTab extends StatelessWidget {
           Text('Voting Power', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
-            'Your voting power is proportional to your EJM balance. 1 EJM = 1 vote. Locked EJM (in escrow or ROSCA) does NOT count toward voting power.',
+            'Your voting power equals your EJM balance. 1 EJM = 1 vote. Locked EJM (in escrow or ROSCA) does NOT count toward voting power.',
             style: TextStyle(color: Colors.grey[600], fontSize: 13),
           ),
         ],
@@ -279,88 +286,70 @@ class _GovHeraldTab extends StatelessWidget {
   }
 
   void _showCreateProposal(BuildContext ctx) {
+    final formKey = GlobalKey<FormState>();
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final fundCtrl = TextEditingController();
+
     showModalBottomSheet(context: ctx, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Submit Proposal', style: Theme.of(c).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Proposal Title', prefixIcon: Icon(Icons.title))),
-          const SizedBox(height: 12),
-          TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description', prefixIcon: Icon(Icons.description)), maxLines: 3),
-          const SizedBox(height: 12),
-          Row(children: [
-            EjmSymbol(size: 24),
-            const SizedBox(width: 8),
-            const Expanded(child: TextField(decoration: InputDecoration(labelText: 'Funding Request (EJM, optional)'), keyboardType: TextInputType.number)),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Submit Proposal', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Proposal Title', prefixIcon: Icon(Icons.title)),
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 12),
+            TextFormField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description', prefixIcon: Icon(Icons.description)), maxLines: 3,
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 12),
+            Row(children: [
+              EjmSymbol(size: 24),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(
+                controller: fundCtrl,
+                decoration: const InputDecoration(labelText: 'Funding Request (EJM, optional)'),
+                keyboardType: TextInputType.number,
+              )),
+            ]),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Proposal submitted for review')));
+              },
+              icon: const Icon(Icons.send), label: const Text('Submit'),
+            ),
+            const SizedBox(height: 20),
           ]),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () { Navigator.pop(c); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Proposal submitted for review'))); },
-            icon: const Icon(Icons.send), label: const Text('Submit'),
-          ),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
 }
 
-// ─── Proposal Tile ───
-class _ProposalTile extends StatelessWidget {
-  final String title, votes, status, deadline;
-  final double percent;
-  const _ProposalTile({required this.title, required this.votes, required this.status, required this.deadline, required this.percent});
+// ─── Empty State ───
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  const _EmptyState({required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    final color = status == 'Passing' ? Colors.green : status == 'Tied' ? Colors.orange : Colors.blue;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        ClipRRect(borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(value: percent, minHeight: 6, color: color, backgroundColor: Colors.grey[200])),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            EjmSymbol(size: 12, color: Colors.grey[600]),
-            const SizedBox(width: 2),
-            Text(votes, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          ]),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-            child: Text(status, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
-          ),
-          Text(deadline, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(children: [
+          Icon(icon, size: 40, color: Colors.grey[400]),
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
         ]),
-      ]),
+      ),
     );
-  }
-}
-
-// ─── Treasury Item ───
-class _TreasuryItem extends StatelessWidget {
-  final String label, value, unit;
-  const _TreasuryItem(this.label, this.value, this.unit);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(children: [
-      Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-      const SizedBox(height: 4),
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        EjmSymbol(size: 14, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 2),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      ]),
-      Text(unit, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
-    ]);
   }
 }
 

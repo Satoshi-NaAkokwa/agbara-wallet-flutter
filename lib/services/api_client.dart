@@ -27,7 +27,6 @@ class ApiClient {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'mnemonic': mnemonic, 'password': password}),
     );
-
     if (response.statusCode == 200 || response.statusCode == 201) {
       return WalletInfo.fromJson(jsonDecode(response.body));
     } else {
@@ -52,7 +51,7 @@ class ApiClient {
     required String toAddress,
     required int amount,
     required String assetId,
-    required String privateKeyWif,
+    String? memo,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/send'),
@@ -62,7 +61,7 @@ class ApiClient {
         'to_address': toAddress,
         'amount': amount,
         'asset_id': assetId,
-        'private_key_wif': privateKeyWif,
+        if (memo != null && memo.isNotEmpty) 'memo': memo,
       }),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -99,11 +98,10 @@ class ApiClient {
       body: jsonEncode({
         'ticker': ticker,
         'precision': precision,
-        'initial_supply': initialSupply,
+        'initialSupply': initialSupply,
         if (domain != null) 'domain': domain,
       }),
     );
-
     if (response.statusCode == 200) {
       return IssuedAsset.fromJson(jsonDecode(response.body));
     } else {
@@ -111,10 +109,28 @@ class ApiClient {
     }
   }
 
-  Future<String> health() async {
+  Future<List<Map<String, dynamic>>> listAssets() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/factory/assets'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      if (body is List) return body.cast<Map<String, dynamic>>();
+      if (body is Map && body.containsKey('assets')) {
+        final list = body['assets'];
+        if (list is List) return list.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } else {
+      throw ApiException('asset list failed: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> health() async {
     final response = await http.get(Uri.parse('$apiBaseUrl/health'));
     if (response.statusCode == 200) {
-      return response.body;
+      return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
       throw ApiException('health check failed: ${response.statusCode}');
     }

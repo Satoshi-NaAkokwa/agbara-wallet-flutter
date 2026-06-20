@@ -136,7 +136,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
               const SizedBox(height: 16),
               _buildActionRow(context, ref, wallet),
               const SizedBox(height: 16),
-              _buildQuickSwap(context),
+              _buildFactorySection(context, ref),
               const SizedBox(height: 16),
               _buildTxHistory(context, txs),
             ],
@@ -198,7 +198,10 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
   }
 
   Widget _buildBalanceCard(BuildContext ctx, Map<String, dynamic>? bal) {
-    final ejm = _extractEjm(bal);
+    final lbtc = bal?['lbtc']?.toString() ?? '0.00000000';
+    final ejm = bal?['ejm']?.toString();
+    final assets = bal?['assets'] as List<dynamic>? ?? [];
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -221,14 +224,29 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             const SizedBox(height: 16),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               EjmAmount(
-                amount: ejm,
+                amount: ejm ?? lbtc,
                 showSymbol: true,
                 symbolSize: 28,
                 style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary),
               ),
               const SizedBox(width: 8),
-              Text('EJM', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+              Text(ejm != null ? 'EJM' : 'L-BTC', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
             ]),
+            if (assets.length > 1) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text('Assets', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
+              const SizedBox(height: 4),
+              ...assets.where((a) => a['ticker'] != 'L-BTC').map((a) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(children: [
+                  Text(a['ticker'] ?? a['asset_id']?.toString().substring(0, 8) ?? 'Asset', style: const TextStyle(fontWeight: FontWeight.w500)),
+                  const Spacer(),
+                  Text(a['balance']?.toString() ?? '0', style: TextStyle(color: Theme.of(ctx).colorScheme.primary)),
+                ]),
+              )),
+            ],
           ],
         ),
       ),
@@ -317,7 +335,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
     ]);
   }
 
-  Widget _buildQuickSwap(BuildContext ctx) {
+  Widget _buildFactorySection(BuildContext ctx, WidgetRef ref) {
     return Card(
       elevation: 1,
       child: Padding(
@@ -325,22 +343,18 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Quick Swap', style: Theme.of(ctx).textTheme.titleMedium),
+            Row(children: [
+              Icon(Icons.factory, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text('Asset Factory', style: Theme.of(ctx).textTheme.titleMedium),
+            ]),
             const SizedBox(height: 8),
-            ListTile(
-              leading: EjmSymbol(size: 28, color: Theme.of(ctx).colorScheme.primary),
-              title: const Text('EJM → L-BTC'),
-              subtitle: const Text('Swap to Liquid Bitcoin'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => _showSwapSheet(ctx, 'EJM', 'LBTC'),
-            ),
-            const Divider(height: 1, indent: 56),
-            ListTile(
-              leading: Icon(Icons.water_drop, color: Colors.blue[400]),
-              title: const Text('L-BTC → EJM'),
-              subtitle: const Text('Swap to EJEMMA'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => _showSwapSheet(ctx, 'LBTC', 'EJM'),
+            Text('Issue new assets on the Liquid sidechain', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => _showIssueAssetSheet(ctx, ref),
+              icon: const Icon(Icons.add_circle),
+              label: const Text('Issue New Asset'),
             ),
           ],
         ),
@@ -365,7 +379,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
       ...txs.map((tx) {
         final dir = tx['direction'] ?? 'receive';
         final amt = tx['amount']?.toString() ?? '0';
-        final asset = tx['asset'] ?? 'EJM';
+        final asset = tx['asset'] ?? 'L-BTC';
         return Card(
           child: ListTile(
             leading: Container(
@@ -410,11 +424,6 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
     );
   }
 
-  String _extractEjm(Map<String, dynamic>? bal) {
-    if (bal == null) return '0.00000000';
-    return bal['ejm']?.toString() ?? bal['EJM']?.toString() ?? bal['ejemma']?.toString() ?? bal['lbtc']?.toString() ?? '0.00000000';
-  }
-
   Future<void> _createWallet(WidgetRef ref) async {
     ref.read(isLoadingProvider.notifier).state = true;
     ref.read(errorProvider.notifier).state = null;
@@ -439,7 +448,9 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
     try {
       final bal = await client.getBalance(w.address);
       ref.read(balanceProvider.notifier).state = bal;
-    } catch (_) { ref.read(balanceProvider.notifier).state = {'ejm': '0.00000000', 'lbtc': '0.00000000'}; }
+    } catch (e) {
+      ref.read(errorProvider.notifier).state = 'Balance refresh failed: $e';
+    }
     try {
       final txs = await client.getTransactions(w.address);
       ref.read(txsProvider.notifier).state = txs;
@@ -472,40 +483,86 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
     final addrCtrl = TextEditingController();
     final amtCtrl = TextEditingController();
     final memoCtrl = TextEditingController();
+    final assetCtrl = TextEditingController(text: 'EJM');
+    final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(context: ctx, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [Icon(Icons.send, color: Theme.of(ctx).colorScheme.primary), const SizedBox(width: 8), Text('Send Remittance', style: Theme.of(c).textTheme.titleLarge)]),
-          const SizedBox(height: 16),
-          TextField(controller: addrCtrl, decoration: const InputDecoration(labelText: 'Recipient Address', prefixIcon: Icon(Icons.person_outline))),
-          const SizedBox(height: 12),
-          Row(children: [
-            EjmSymbol(size: 24, color: Theme.of(ctx).colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(child: TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (EJM)'), keyboardType: TextInputType.number)),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Icon(Icons.send, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text('Send Remittance', style: Theme.of(c).textTheme.titleLarge),
+            ]),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: addrCtrl,
+              decoration: const InputDecoration(labelText: 'Recipient Address', prefixIcon: Icon(Icons.person_outline)),
+              validator: (v) => v == null || v.isEmpty ? 'Address required' : null,
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              EjmSymbol(size: 24, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  controller: amtCtrl,
+                  decoration: const InputDecoration(labelText: 'Amount'),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Amount required';
+                    if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Invalid amount';
+                    return null;
+                  },
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: assetCtrl,
+              decoration: const InputDecoration(labelText: 'Asset', prefixIcon: Icon(Icons.token)),
+              readOnly: true,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: memoCtrl,
+              decoration: const InputDecoration(labelText: 'Memo (optional)', prefixIcon: Icon(Icons.note), hintText: 'e.g., Family remittance June'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () async {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ref.read(isLoadingProvider.notifier).state = true;
+                ref.read(errorProvider.notifier).state = null;
+                try {
+                  final client = ref.read(apiClientProvider);
+                  final amountSats = (double.parse(amtCtrl.text) * 100000000).toInt();
+                  final txid = await client.sendAsset(
+                    fromAddress: w.address,
+                    toAddress: addrCtrl.text.trim(),
+                    amount: amountSats,
+                    assetId: assetCtrl.text.trim(),
+                    memo: memoCtrl.text.trim(),
+                  );
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Transaction broadcast: $txid')));
+                  await _refreshWallet(ref);
+                } catch (e) {
+                  ref.read(errorProvider.notifier).state = 'Send failed: $e';
+                } finally {
+                  ref.read(isLoadingProvider.notifier).state = false;
+                }
+              },
+              icon: const Icon(Icons.send), label: const Text('Broadcast'),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Theme.of(ctx).colorScheme.primary, foregroundColor: Colors.white),
+            ),
+            const SizedBox(height: 20),
           ]),
-          const SizedBox(height: 12),
-          TextField(controller: memoCtrl, decoration: const InputDecoration(labelText: 'Memo (optional)', prefixIcon: Icon(Icons.note), hintText: 'e.g., Family remittance June')),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(c); ref.read(isLoadingProvider.notifier).state = true;
-              try {
-                final client = ref.read(apiClientProvider);
-                final txid = await client.sendAsset(fromAddress: w.address, toAddress: addrCtrl.text.trim(), amount: int.tryParse(amtCtrl.text) ?? 0, assetId: 'EJM', privateKeyWif: '');
-                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Sent: $txid')));
-                await _refreshWallet(ref);
-              } catch (e) { ref.read(errorProvider.notifier).state = e.toString(); }
-              finally { ref.read(isLoadingProvider.notifier).state = false; }
-            },
-            icon: const Icon(Icons.send), label: const Text('Broadcast'),
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Theme.of(ctx).colorScheme.primary, foregroundColor: Colors.white),
-          ),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
@@ -518,41 +575,158 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
         child: Column(children: [
           Padding(padding: const EdgeInsets.all(16.0),
             child: Row(children: [
-              Icon(Icons.qr_code_scanner, color: Theme.of(ctx).colorScheme.primary), const SizedBox(width: 8), Text('Scan QR Code', style: Theme.of(c).textTheme.titleLarge), const Spacer(), IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(c)),
+              Icon(Icons.qr_code_scanner, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text('Scan QR Code', style: Theme.of(c).textTheme.titleLarge),
+              const Spacer(),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(c)),
             ]),
           ),
-          Expanded(child: MobileScanner(onDetect: (capture) {
-            for (final barcode in capture.barcodes) {
-              final raw = barcode.rawValue;
-              if (raw != null && raw.isNotEmpty) { Navigator.pop(c); _showSendSheet(ctx, ref, w); break; }
-            }
-          })),
+          Expanded(child: MobileScanner(
+            onDetect: (capture) {
+              for (final barcode in capture.barcodes) {
+                final raw = barcode.rawValue;
+                if (raw != null && raw.isNotEmpty) {
+                  Navigator.pop(c);
+                  // Show send sheet pre-filled with scanned address
+                  final addrCtrl = TextEditingController(text: raw);
+                  final amtCtrl = TextEditingController();
+                  final memoCtrl = TextEditingController();
+                  showModalBottomSheet(context: ctx, isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                    builder: (c2) => Padding(
+                      padding: EdgeInsets.only(bottom: MediaQuery.of(c2).viewInsets.bottom, left: 20, right: 20, top: 20),
+                      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Text('Send to Scanned Address', style: Theme.of(c2).textTheme.titleLarge),
+                        const SizedBox(height: 16),
+                        TextField(controller: addrCtrl, decoration: const InputDecoration(labelText: 'Address'), readOnly: true),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          EjmSymbol(size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (EJM)'), keyboardType: TextInputType.number)),
+                        ]),
+                        const SizedBox(height: 12),
+                        TextField(controller: memoCtrl, decoration: const InputDecoration(labelText: 'Memo (optional)')),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(c2);
+                            ref.read(isLoadingProvider.notifier).state = true;
+                            try {
+                              final client = ref.read(apiClientProvider);
+                              final amountSats = (double.parse(amtCtrl.text) * 100000000).toInt();
+                              final txid = await client.sendAsset(
+                                fromAddress: w.address,
+                                toAddress: addrCtrl.text.trim(),
+                                amount: amountSats,
+                                assetId: 'EJM',
+                                memo: memoCtrl.text.trim(),
+                              );
+                              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Sent: $txid')));
+                              await _refreshWallet(ref);
+                            } catch (e) {
+                              ref.read(errorProvider.notifier).state = 'Send failed: $e';
+                            } finally {
+                              ref.read(isLoadingProvider.notifier).state = false;
+                            }
+                          },
+                          icon: const Icon(Icons.send), label: const Text('Send'),
+                        ),
+                        const SizedBox(height: 20),
+                      ]),
+                    ),
+                  );
+                  break;
+                }
+              }
+            },
+          )),
         ]),
       ),
     );
   }
 
-  void _showSwapSheet(BuildContext ctx, String from, String to) {
-    final amtCtrl = TextEditingController();
+  void _showIssueAssetSheet(BuildContext ctx, WidgetRef ref) {
+    final tickerCtrl = TextEditingController(text: 'EJM');
+    final supplyCtrl = TextEditingController(text: '1000000000');
+    final precisionCtrl = TextEditingController(text: '8');
+    final domainCtrl = TextEditingController(text: 'ugogbe.info');
+    final formKey = GlobalKey<FormState>();
+
     showModalBottomSheet(context: ctx, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Swap $from → $to', style: Theme.of(c).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          Row(children: [
-            from == 'EJM' ? EjmSymbol(size: 24) : Icon(Icons.water_drop, color: Colors.blue[400]),
-            const SizedBox(width: 8),
-            Expanded(child: TextField(controller: amtCtrl, decoration: InputDecoration(labelText: 'Amount ($from)'), keyboardType: TextInputType.number)),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Issue Asset on Liquid', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: tickerCtrl,
+              decoration: const InputDecoration(labelText: 'Ticker', prefixIcon: Icon(Icons.label)),
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: supplyCtrl,
+              decoration: const InputDecoration(labelText: 'Initial Supply', prefixIcon: Icon(Icons.inventory)),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                if (int.tryParse(v) == null || int.parse(v) <= 0) return 'Invalid';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: precisionCtrl,
+              decoration: const InputDecoration(labelText: 'Precision (decimals)', prefixIcon: Icon(Icons.calculate)),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                final p = int.tryParse(v);
+                if (p == null || p < 0 || p > 8) return '0-8 only';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: domainCtrl,
+              decoration: const InputDecoration(labelText: 'Domain (for NIP-05)', prefixIcon: Icon(Icons.language)),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () async {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ref.read(isLoadingProvider.notifier).state = true;
+                ref.read(errorProvider.notifier).state = null;
+                try {
+                  final client = ref.read(apiClientProvider);
+                  final asset = await client.issueAsset(
+                    ticker: tickerCtrl.text.trim(),
+                    precision: int.parse(precisionCtrl.text),
+                    initialSupply: int.parse(supplyCtrl.text),
+                    domain: domainCtrl.text.trim(),
+                  );
+                  showDialog(context: ctx, builder: (c2) => AlertDialog(
+                    title: const Text('Asset Issued'),
+                    content: SelectableText('Asset ID: ${asset.assetId}\nTx ID: ${asset.txid}'),
+                    actions: [TextButton(onPressed: () => Navigator.pop(c2), child: const Text('OK'))],
+                  ));
+                } catch (e) {
+                  ref.read(errorProvider.notifier).state = 'Asset issuance failed: $e';
+                } finally {
+                  ref.read(isLoadingProvider.notifier).state = false;
+                }
+              },
+              icon: const Icon(Icons.factory), label: const Text('Issue Asset'),
+            ),
+            const SizedBox(height: 20),
           ]),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () { Navigator.pop(c); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Swap $from → $to submitted'))); },
-            icon: const Icon(Icons.swap_horiz), label: const Text('Submit Swap'),
-          ),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
@@ -574,7 +748,6 @@ class _ExchangeTabState extends ConsumerState<_ExchangeTab> {
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      // Sub-tab selector
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: SegmentedButton<int>(
@@ -613,32 +786,54 @@ class _P2PSubTab extends StatelessWidget {
         const SizedBox(height: 16),
         Text('Active Orders', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        _OrderTile(type: 'Buy', amount: '500', price: '0.0001 LBTC/EJM', time: '2m ago', color: Colors.green),
-        _OrderTile(type: 'Sell', amount: '1,200', price: '0.00012 LBTC/EJM', time: '5m ago', color: Colors.red),
-        _OrderTile(type: 'Buy', amount: '300', price: '0.000098 LBTC/EJM', time: '12m ago', color: Colors.green),
+        _EmptyState(icon: Icons.receipt_long, message: 'No active orders\nCreate one to start trading'),
       ]),
     );
   }
 
   void _showCreateOrder(BuildContext ctx) {
+    final formKey = GlobalKey<FormState>();
+    final amtCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+
     showModalBottomSheet(context: ctx, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Create Order', style: Theme.of(c).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          Row(children: [
-            EjmSymbol(size: 24),
-            const SizedBox(width: 8),
-            const Expanded(child: TextField(decoration: InputDecoration(labelText: 'Amount (EJM)'), keyboardType: TextInputType.number)),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Create Order', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Row(children: [
+              EjmSymbol(size: 24),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(
+                controller: amtCtrl,
+                decoration: const InputDecoration(labelText: 'Amount (EJM)'),
+                keyboardType: TextInputType.number,
+                validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
+              )),
+            ]),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: priceCtrl,
+              decoration: const InputDecoration(labelText: 'Price per EJM (in L-BTC)'),
+              keyboardType: TextInputType.number,
+              validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Order created (backend integration pending)')));
+              },
+              icon: const Icon(Icons.post_add), label: const Text('Post Order'),
+            ),
+            const SizedBox(height: 20),
           ]),
-          const SizedBox(height: 12),
-          const TextField(decoration: InputDecoration(labelText: 'Price per EJM (in L-BTC)'), keyboardType: TextInputType.number),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.post_add), label: const Text('Post Order')),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
@@ -652,42 +847,60 @@ class _EscrowSubTab extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _buildInfoCard(context, Icons.verified_user, 'Escrow Protection', 'Secure your trades with 2-of-3 multi-sig escrow.', Colors.orange),
+        _buildInfoCard(context, Icons.verified_user, 'Escrow Protection', 'Secure your trades with 2-of-3 multi-sig escrow. All fees paid in EJM.', Colors.orange),
         const SizedBox(height: 16),
         ElevatedButton.icon(
           onPressed: () => _showCreateEscrow(context),
           icon: const Icon(Icons.lock), label: const Text('Create Escrow'),
         ),
         const SizedBox(height: 16),
-        Card(child: ListTile(
-          leading: const Icon(Icons.hourglass_empty, color: Colors.grey),
-          title: const Text('No active escrows'),
-          subtitle: const Text('Create one to get started'),
-        )),
+        _EmptyState(icon: Icons.hourglass_empty, message: 'No active escrows\nCreate one to secure a trade'),
       ]),
     );
   }
 
   void _showCreateEscrow(BuildContext ctx) {
+    final formKey = GlobalKey<FormState>();
+    final addrCtrl = TextEditingController();
+    final amtCtrl = TextEditingController();
+
     showModalBottomSheet(context: ctx, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Create Escrow', style: Theme.of(c).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          const TextField(decoration: InputDecoration(labelText: 'Counterparty Address', prefixIcon: Icon(Icons.person))),
-          const SizedBox(height: 12),
-          Row(children: [
-            EjmSymbol(size: 24),
-            const SizedBox(width: 8),
-            const Expanded(child: TextField(decoration: InputDecoration(labelText: 'Amount (EJM)'), keyboardType: TextInputType.number)),
+        child: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Create Escrow', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: addrCtrl,
+              decoration: const InputDecoration(labelText: 'Counterparty Address', prefixIcon: Icon(Icons.person)),
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              EjmSymbol(size: 24),
+              const SizedBox(width: 8),
+              Expanded(child: TextFormField(
+                controller: amtCtrl,
+                decoration: const InputDecoration(labelText: 'Amount (EJM)'),
+                keyboardType: TextInputType.number,
+                validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
+              )),
+            ]),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(c);
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Escrow created (smart contract integration pending)')));
+              },
+              icon: const Icon(Icons.lock), label: const Text('Lock Funds'),
+            ),
+            const SizedBox(height: 20),
           ]),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(onPressed: () { Navigator.pop(c); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Escrow created'))); },
-            icon: const Icon(Icons.lock), label: const Text('Lock Funds')),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
@@ -698,11 +911,7 @@ class _MyOrdersSubTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(Icons.list_alt, size: 48, color: Colors.grey[400]),
-      const SizedBox(height: 12),
-      Text('No orders yet', style: TextStyle(color: Colors.grey[600])),
-    ]));
+    return _EmptyState(icon: Icons.list_alt, message: 'No orders yet\nYour P2P and escrow orders will appear here');
   }
 }
 
@@ -711,7 +920,8 @@ class _MyOrdersSubTab extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════
 
 Widget _buildInfoCard(BuildContext ctx, IconData icon, String title, String subtitle, Color color) {
-  return Card(color: color.withOpacity(0.05),
+  return Card(
+    color: color.withOpacity(0.05),
     child: Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(children: [
@@ -728,23 +938,22 @@ Widget _buildInfoCard(BuildContext ctx, IconData icon, String title, String subt
   );
 }
 
-class _OrderTile extends StatelessWidget {
-  final String type, amount, price, time;
-  final Color color;
-  const _OrderTile({required this.type, required this.amount, required this.price, required this.time, required this.color});
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  const _EmptyState({required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return Card(child: ListTile(
-      leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-        child: Icon(type == 'Buy' ? Icons.arrow_downward : Icons.arrow_upward, color: color, size: 20)),
-      title: Row(mainAxisSize: MainAxisSize.min, children: [
-        EjmSymbol(size: 16, color: color),
-        const SizedBox(width: 4),
-        Text('$type $amount EJM'),
-      ]),
-      subtitle: Text('$price • $time'),
-      trailing: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(visualDensity: VisualDensity.compact), child: const Text('Match')),
-    ));
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(children: [
+          Icon(icon, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
+        ]),
+      ),
+    );
   }
 }

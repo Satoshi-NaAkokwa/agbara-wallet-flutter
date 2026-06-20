@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_providers.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -84,12 +85,22 @@ class SettingsScreen extends ConsumerWidget {
             ]),
             const SizedBox(height: 20),
 
-            _buildSectionHeader(context, 'About'),
+            _buildSectionHeader(context, 'Support'),
             _buildCard(context, [
               ListTile(
-                leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
-                title: const Text('About EJEMMA Wallet'),
-                subtitle: const Text('v0.1.1 • Biafran Remittance • Liquid sidechain'),
+                leading: Icon(Icons.help_outline, color: Theme.of(context).colorScheme.primary),
+                title: const Text('FAQ'),
+                subtitle: const Text('Frequently asked questions'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showFAQ(context),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: Icon(Icons.security, color: Theme.of(context).colorScheme.primary),
+                title: const Text('Security'),
+                subtitle: const Text('How your assets are protected'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showSecurity(context),
               ),
               const Divider(height: 1, indent: 56),
               ListTile(
@@ -97,12 +108,30 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text('View Source'),
                 subtitle: const Text('github.com/Satoshi-NaAkokwa/agbara-wallet-flutter'),
                 trailing: const Icon(Icons.open_in_new, size: 18),
-                onTap: () {},
+                onTap: () async {
+                  final uri = Uri.parse('https://github.com/Satoshi-NaAkokwa/agbara-wallet-flutter');
+                  if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+              ),
+            ]),
+            const SizedBox(height: 20),
+
+            _buildSectionHeader(context, 'About'),
+            _buildCard(context, [
+              ListTile(
+                leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                title: const Text('EJEMMA Wallet'),
+                subtitle: const Text('v0.2.1 • Production Release\nLiquid sidechain • Asset factory • Smart contracts'),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: Icon(Icons.shield, color: Colors.green[700]),
+                title: const Text('Asset Safety Guarantee'),
+                subtitle: const Text('Self-custodial • BIP-39 mnemonic • No third-party control'),
               ),
             ]),
             const SizedBox(height: 40),
 
-            // EJEMMA branding footer
             Center(
               child: Column(
                 children: [
@@ -286,7 +315,6 @@ class SettingsScreen extends ConsumerWidget {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
               Navigator.pop(ctx);
-              // Clear ALL shared providers
               ref.read(walletProvider.notifier).state = null;
               ref.read(mnemonicProvider.notifier).state = null;
               ref.read(balanceProvider.notifier).state = null;
@@ -303,6 +331,165 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showFAQ(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (c) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (_, scrollCtrl) => Container(
+          padding: const EdgeInsets.all(20),
+          child: ListView(
+            controller: scrollCtrl,
+            children: [
+              Text('Frequently Asked Questions', style: Theme.of(c).textTheme.headlineSmall),
+              const SizedBox(height: 20),
+              _faqItem(c, 'What is EJEMMA?', 
+                'EJEMMA (EJM) is the official digital currency of the Biafran Government in Exile. It is issued on the Bitcoin Liquid sidechain, making it a real Bitcoin-backed asset with fast, confidential transactions.'),
+              _faqItem(c, 'How do I receive EJM?',
+                'Tap "Create Wallet" to generate your unique address. Share your QR code or address with the sender. Your balance updates automatically when funds arrive.'),
+              _faqItem(c, 'How do I send remittances?',
+                'Tap "Send", enter the recipient\'s Liquid address, the amount in EJM, and an optional memo. Tap "Broadcast" to submit the transaction to the network.'),
+              _faqItem(c, 'What are transaction fees?',
+                'All EJM transactions pay a small network fee in L-BTC (Liquid Bitcoin). The app automatically calculates and includes the optimal fee. P2P exchange and escrow have additional protocol fees of 0.1-0.3% paid in EJM.'),
+              _faqItem(c, 'Is my wallet secure?',
+                'Yes. EJEMMA is fully self-custodial. Your private keys are derived from your 12-word mnemonic. Only YOU have access. Write your mnemonic on paper and store it safely — it is the ONLY way to recover your wallet.'),
+              _faqItem(c, 'Can I issue my own asset?',
+                'Yes. In the Wallet tab, tap "Issue New Asset" in the Asset Factory section. You can create custom tokens on the Liquid sidechain with your chosen ticker, supply, and precision.'),
+              _faqItem(c, 'What is ROSCA?',
+                'ROSCA (Rotating Savings and Credit Association) is a traditional group savings model. Members contribute EJM each round, and one member receives the full pot. It is enforced by smart contracts.'),
+              _faqItem(c, 'How does governance work?',
+                'Every EJM holder can vote on proposals. 1 EJM = 1 vote. Proposals can allocate treasury funds, change fees, or update protocol parameters. Voting power equals your liquid EJM balance.'),
+              _faqItem(c, 'What if I lose my phone?',
+                'Restore your wallet on any device using your 12-word mnemonic. Go to Settings > Reveal Mnemonic to view it. NEVER store your mnemonic digitally — write it on paper only.'),
+              _faqItem(c, 'How do I swap EJM for L-BTC?',
+                'The Quick Swap feature in the Wallet tab allows instant conversion. For larger trades, use the P2P Exchange tab to find counterparty orders.'),
+              _faqItem(c, 'Who controls my assets?',
+                'NO ONE except you. EJEMMA is non-custodial. The Biafran Government in Exile can issue assets and set protocol rules, but cannot access, freeze, or confiscate your funds.'),
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSecurity(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (c) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (_, scrollCtrl) => Container(
+          padding: const EdgeInsets.all(20),
+          child: ListView(
+            controller: scrollCtrl,
+            children: [
+              Row(children: [
+                Icon(Icons.security, color: Theme.of(c).colorScheme.primary, size: 28),
+                const SizedBox(width: 12),
+                Text('Security Architecture', style: Theme.of(c).textTheme.headlineSmall),
+              ]),
+              const SizedBox(height: 20),
+              _securityItem(c, 'Self-Custodial Design', 
+                'Your private keys never leave your device. They are derived from your BIP-39 mnemonic using industry-standard secp256k1 cryptography. No server, cloud, or third party ever sees your keys.',
+                Icons.vpn_key),
+              _securityItem(c, 'Mnemonic Backup',
+                'Your 12-word seed phrase is the master key to ALL your assets. Write it on paper, store it in a secure physical location, and never photograph, email, or message it.',
+                Icons.backup),
+              _securityItem(c, 'Encrypted Storage',
+                'Wallet data is stored using AES-256-GCM encryption with Argon2 key derivation. Even if your device is compromised, the attacker cannot extract your keys without your knowledge.',
+                Icons.enhanced_encryption),
+              _securityItem(c, 'Asset Issuance Security',
+                'All issued assets are anchored to the Bitcoin blockchain via the Liquid sidechain. Asset IDs are deterministic and cryptographically verifiable. The issuer contract is immutable once deployed.',
+                Icons.verified),
+              _securityItem(c, 'Transaction Validation',
+                'Every transaction is signed locally on your device, then broadcast to the Liquid network. The daemon validates but never signs — you retain exclusive signing authority.',
+                Icons.check_circle),
+              _securityItem(c, 'Fee Structure',
+                'Network fees: Paid in L-BTC to Liquid miners.\nProtocol fees: Paid in EJM to the treasury.\nEscrow fees: 0.2% paid to escrow agents.\nNo hidden fees. All rates are transparent and on-chain.',
+                Icons.attach_money),
+              _securityItem(c, 'Recovery Process',
+                'If your device is lost, stolen, or damaged: Install EJEMMA on a new device, select "Restore from Mnemonic", enter your 12 words in order, and your full balance reappears instantly.',
+                Icons.restore),
+              _securityItem(c, 'Smart Contract Audits',
+                'All smart contracts (P2P Exchange, Escrow, ROSCA) are open source and subject to community review. Formal verification and third-party audits are planned for v1.0.',
+                Icons.policy),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Icon(Icons.shield, color: Colors.green[700]),
+                    const SizedBox(width: 8),
+                    Text('Asset Safety Guarantee', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green[700])),
+                  ]),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'EJEMMA guarantees that:\n'
+                    '1. Your assets are always under your control\n'
+                    '2. No entity can freeze or confiscate your funds\n'
+                    '3. All transactions are final and irreversible\n'
+                    '4. Your mnemonic is the sole recovery method\n'
+                    '5. The code is open source and auditable',
+                    style: TextStyle(fontSize: 13, height: 1.5),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _faqItem(BuildContext context, String question, String answer) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(question, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        const SizedBox(height: 4),
+        Text(answer, style: TextStyle(color: Colors.grey[700], fontSize: 13, height: 1.5)),
+      ]),
+    );
+  }
+
+  Widget _securityItem(BuildContext context, String title, String content, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 4),
+          Text(content, style: TextStyle(color: Colors.grey[700], fontSize: 13, height: 1.5)),
+        ])),
+      ]),
     );
   }
 }
