@@ -1,160 +1,265 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/api_provider.dart';
+import '../providers/app_providers.dart';
 
-final darkModeProvider = StateProvider<bool>((ref) => false);
-
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _showMnemonic = false;
-  String? _mnemonic;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = ref.watch(darkModeProvider);
     final client = ref.read(apiClientProvider);
+    final mnemonic = ref.watch(mnemonicProvider);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 16),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        automaticallyImplyLeading: false,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildSectionHeader(context, 'Network'),
+            _buildCard(context, [
+              _buildCopyTile(
+                context: context,
+                icon: Icons.cloud,
+                title: 'Daemon URL',
+                value: client.baseUrl,
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildCopyTile(
+                context: context,
+                icon: Icons.api,
+                title: 'API URL',
+                value: client.apiBaseUrl,
+              ),
+            ]),
+            const SizedBox(height: 20),
 
-          // Network Section
-          Card(
-            elevation: 1,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.cloud),
-                  title: const Text('Daemon URL'),
-                  subtitle: Text(client.baseUrl, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: client.baseUrl));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied')));
-                    },
-                  ),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.api),
-                  title: const Text('API URL'),
-                  subtitle: Text(client.apiBaseUrl, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: client.apiBaseUrl));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied')));
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+            _buildSectionHeader(context, 'Appearance'),
+            _buildCard(context, [
+              SwitchListTile(
+                secondary: Icon(Icons.dark_mode, color: Theme.of(context).colorScheme.primary),
+                title: const Text('Dark Mode'),
+                subtitle: const Text('Toggle app theme'),
+                value: isDark,
+                onChanged: (v) => ref.read(darkModeProvider.notifier).state = v,
+              ),
+            ]),
+            const SizedBox(height: 20),
 
-          // Appearance
-          Card(
-            elevation: 1,
-            child: SwitchListTile(
-              secondary: const Icon(Icons.dark_mode),
-              title: const Text('Dark Mode'),
-              subtitle: const Text('Toggle app theme'),
-              value: isDark,
-              onChanged: (v) => ref.read(darkModeProvider.notifier).state = v,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Security
-          Card(
-            elevation: 1,
-            child: Column(
-              children: [
+            _buildSectionHeader(context, 'Wallet'),
+            _buildCard(context, [
+              if (mnemonic != null)
                 ListTile(
-                  leading: const Icon(Icons.security),
-                  title: const Text('Security'),
-                  subtitle: const Text('Mnemonic backup & lock'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.visibility),
+                  leading: Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary),
                   title: const Text('Reveal Mnemonic'),
-                  subtitle: const Text('Show your 12/24 word seed'),
-                  trailing: IconButton(
-                    icon: Icon(_showMnemonic ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () {
-                      setState(() => _showMnemonic = !_showMnemonic);
-                      if (_showMnemonic) _showMnemonicDialog(context);
-                    },
+                  subtitle: Text(
+                    '${mnemonic.split(' ').take(3).join(' ')} ...',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: const Text('Erase Wallet', style: TextStyle(color: Colors.red)),
-                  subtitle: const Text('Remove keys from this device'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _confirmErase(context, ref),
+                  onTap: () => _showMnemonicReveal(context, mnemonic),
+                )
+              else
+                ListTile(
+                  leading: Icon(Icons.visibility_off, color: Colors.grey[400]),
+                  title: const Text('Reveal Mnemonic'),
+                  subtitle: const Text('No wallet loaded'),
+                  enabled: false,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Erase Wallet', style: TextStyle(color: Colors.red)),
+                subtitle: const Text('Remove keys from this device'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _confirmErase(context, ref),
+              ),
+            ]),
+            const SizedBox(height: 20),
 
-          // About
-          Card(
-            elevation: 1,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: const Text('About Agbara Wallet'),
-                  subtitle: const Text('v0.1.0 • Liquid sidechain • Token factory'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.code),
-                  title: const Text('View Source'),
-                  subtitle: const Text('github.com/Satoshi-NaAkokwa/agbara-wallet-flutter'),
-                  trailing: const Icon(Icons.open_in_new, size: 18),
-                  onTap: () {}, // url_launcher could be wired here
-                ),
-              ],
+            _buildSectionHeader(context, 'About'),
+            _buildCard(context, [
+              ListTile(
+                leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                title: const Text('About EJEMMA Wallet'),
+                subtitle: const Text('v0.1.1 • Biafran Remittance • Liquid sidechain'),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: Icon(Icons.code, color: Theme.of(context).colorScheme.primary),
+                title: const Text('View Source'),
+                subtitle: const Text('github.com/Satoshi-NaAkokwa/agbara-wallet-flutter'),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: () {},
+              ),
+            ]),
+            const SizedBox(height: 40),
+
+            // EJEMMA branding footer
+            Center(
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.currency_exchange, size: 20, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'EJEMMA • EJM',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'For the Biafran Government in Exile',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  void _showMnemonicDialog(BuildContext context) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 6),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, List<Widget> children) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildCopyTile({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title: Text(title),
+      subtitle: Text(
+        value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.copy, size: 18),
+        onPressed: () {
+          Clipboard.setData(ClipboardData(text: value));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$title copied'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showMnemonicReveal(BuildContext context, String mnemonic) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Backup Mnemonic'),
-        content: const Text(
-          'Your mnemonic is the ONLY way to recover this wallet.\n\nWrite it down on paper and store it securely. Never share it online.',
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber, color: Colors.orange[700]),
+            const SizedBox(width: 8),
+            const Text('Backup Mnemonic'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).colorScheme.error.withOpacity(0.3)),
+              ),
+              child: Text(
+                'Write these words down on paper and store them in a secure place. NEVER share them online or screenshot them.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(
+                mnemonic,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  height: 1.6,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: mnemonic));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Mnemonic copied (keep it safe)')),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy to clipboard'),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              setState(() => _showMnemonic = false);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Hide'),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -165,18 +270,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Erase Wallet?', style: TextStyle(color: Colors.red)),
-        content: const Text('This removes all wallet data from this device. Make sure your mnemonic is backed up first.'),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_forever, color: Colors.red),
+            const SizedBox(width: 8),
+            const Text('Erase Wallet?'),
+          ],
+        ),
+        content: const Text(
+          'This permanently removes all wallet data from this device.\n\nMake sure your 12-word mnemonic is backed up on paper before proceeding.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
               Navigator.pop(ctx);
-              // Reset all wallet providers
-              // Note: These providers live in wallet_screen.dart; in a real app they'd be in a central place
+              // Clear ALL shared providers
+              ref.read(walletProvider.notifier).state = null;
+              ref.read(mnemonicProvider.notifier).state = null;
+              ref.read(balanceProvider.notifier).state = null;
+              ref.read(txsProvider.notifier).state = [];
+              ref.read(errorProvider.notifier).state = null;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Wallet erased. Restart app to onboard again.')),
+                const SnackBar(
+                  content: Text('Wallet erased. Restart app to create a new one.'),
+                  backgroundColor: Colors.red,
+                ),
               );
             },
             child: const Text('Erase', style: TextStyle(color: Colors.white)),

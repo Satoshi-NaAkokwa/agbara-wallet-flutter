@@ -1,6 +1,2 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/api_client.dart';
-
-final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient();
-});
+// Re-export from central providers for backward compatibility
+export 'app_providers.dart';
