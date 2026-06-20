@@ -223,15 +223,35 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             ]),
             const SizedBox(height: 16),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              EjmAmount(
-                amount: ejm ?? lbtc,
-                showSymbol: true,
-                symbolSize: 28,
-                style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary),
-              ),
-              const SizedBox(width: 8),
-              if (ejm == null) Text('L-BTC', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+              if (ejm != null) ...[
+                EjmAmount(
+                  amount: ejm,
+                  showSymbol: true,
+                  symbolSize: 28,
+                  style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary),
+                ),
+                const SizedBox(width: 8),
+                Text('EJM', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+              ] else ...[
+                Text(lbtc, style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary)),
+                const SizedBox(width: 8),
+                Text('L-BTC (regtest)', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+              ],
             ]),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.warning_amber, size: 14, color: Colors.orange[700]),
+                const SizedBox(width: 6),
+                Text('REGTEST MODE — Not real money', style: TextStyle(fontSize: 11, color: Colors.orange[700], fontWeight: FontWeight.w600)),
+              ]),
+            ),
             if (assets.length > 1) ...[
               const SizedBox(height: 12),
               const Divider(),
@@ -282,19 +302,16 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SelectableText(w.address, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                  if (mnemonic != null) ...[
-                    const SizedBox(height: 6),
-                    Row(children: [
-                      Expanded(
-                        child: Text('Seed: ${mnemonic.split(' ').take(3).join(' ')} ...',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey), overflow: TextOverflow.ellipsis),
-                      ),
-                      IconButton(icon: const Icon(Icons.copy, size: 16), onPressed: () {
-                        Clipboard.setData(ClipboardData(text: mnemonic));
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Mnemonic copied')));
-                      }),
-                    ]),
-                  ],
+                  // SECURITY: Never display mnemonic on main screen. Use Settings > Reveal Mnemonic only.
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    Icon(Icons.security, size: 14, color: Colors.green[700]),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text('Self-custodial: Keys never leave this device',
+                        style: TextStyle(fontSize: 11, color: Colors.green[700]), overflow: TextOverflow.ellipsis),
+                    ),
+                  ]),
                 ],
               ),
             ),
