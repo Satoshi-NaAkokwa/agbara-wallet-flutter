@@ -104,7 +104,7 @@ class _CommunityTab extends StatelessWidget {
           Text('How ROSCA Works', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           _buildStep(context, '1', 'Create or join a savings group with trusted members'),
-          _buildStep(context, '2', 'Each member contributes EJM per round'),
+          _buildStep(context, '2', 'Each member contributes ₵ per round'),
           _buildStep(context, '3', 'One member receives the pot each cycle via smart contract'),
           _buildStep(context, '4', 'Continue until all members have received their turn'),
         ],
@@ -136,7 +136,7 @@ class _CommunityTab extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: TextFormField(
                 controller: contribCtrl,
-                decoration: const InputDecoration(labelText: 'Contribution per round (EJM)'),
+                decoration: const InputDecoration(labelText: 'Contribution per round (₵)'),
                 keyboardType: TextInputType.number,
                 validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
               )),
@@ -277,7 +277,7 @@ class _GovHeraldTab extends StatelessWidget {
           Text('Voting Power', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
-            'Your voting power equals your EJM balance. 1 EJM = 1 vote. Locked EJM (in escrow or ROSCA) does NOT count toward voting power.',
+            'Your voting power equals your ₵ balance. 1 ₵ = 1 vote. Locked ₵ (in escrow or ROSCA) does NOT count toward voting power.',
             style: TextStyle(color: Colors.grey[600], fontSize: 13),
           ),
         ],
@@ -311,7 +311,7 @@ class _GovHeraldTab extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: TextFormField(
                 controller: fundCtrl,
-                decoration: const InputDecoration(labelText: 'Funding Request (EJM, optional)'),
+                decoration: const InputDecoration(labelText: 'Funding Request (₵, optional)'),
                 keyboardType: TextInputType.number,
               )),
             ]),

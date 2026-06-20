@@ -218,7 +218,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
               const SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Total Balance', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
-                Text('EJEMMA (EJM)', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('EJEMMA', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               ]),
             ]),
             const SizedBox(height: 16),
@@ -230,7 +230,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                 style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary),
               ),
               const SizedBox(width: 8),
-              Text(ejm != null ? 'EJM' : 'L-BTC', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+              if (ejm == null) Text('L-BTC', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
             ]),
             if (assets.length > 1) ...[
               const SizedBox(height: 12),
@@ -391,9 +391,10 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
               child: Icon(dir == 'send' ? Icons.arrow_upward : Icons.arrow_downward,
                 color: dir == 'send' ? Colors.red : Colors.green, size: 20),
             ),
-            title: asset == 'EJM'
-              ? EjmAmount(amount: amt, style: const TextStyle(fontWeight: FontWeight.w600))
-              : Text('$amt $asset', style: const TextStyle(fontWeight: FontWeight.w600)),
+            title: Text.rich(TextSpan(children: [
+              const TextSpan(text: '₵', style: TextStyle(fontWeight: FontWeight.bold)),
+              TextSpan(text: '$amt $asset', style: const TextStyle(fontWeight: FontWeight.w600)),
+            ])),
             subtitle: Text(tx['txid']?.toString().substring(0, 16) ?? '...'),
             trailing: Text(tx['status'] ?? 'confirmed', style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.primary)),
           ),
@@ -524,7 +525,11 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             const SizedBox(height: 12),
             TextFormField(
               controller: assetCtrl,
-              decoration: const InputDecoration(labelText: 'Asset', prefixIcon: Icon(Icons.token)),
+              decoration: InputDecoration(
+                labelText: 'Asset',
+                prefixIcon: const EjmSymbol(size: 20),
+                border: const OutlineInputBorder(),
+              ),
               readOnly: true,
             ),
             const SizedBox(height: 12),
@@ -604,7 +609,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                         Row(children: [
                           EjmSymbol(size: 24),
                           const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (EJM)'), keyboardType: TextInputType.number)),
+                          Expanded(child: TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: '₵ Amount'), keyboardType: TextInputType.number)),
                         ]),
                         const SizedBox(height: 12),
                         TextField(controller: memoCtrl, decoration: const InputDecoration(labelText: 'Memo (optional)')),
@@ -810,7 +815,7 @@ class _P2PSubTab extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: TextFormField(
                 controller: amtCtrl,
-                decoration: const InputDecoration(labelText: 'Amount (EJM)'),
+                decoration: const InputDecoration(labelText: '₵ Amount'),
                 keyboardType: TextInputType.number,
                 validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
               )),
@@ -818,7 +823,7 @@ class _P2PSubTab extends StatelessWidget {
             const SizedBox(height: 12),
             TextFormField(
               controller: priceCtrl,
-              decoration: const InputDecoration(labelText: 'Price per EJM (in L-BTC)'),
+              decoration: const InputDecoration(labelText: 'Price per ₵ (in L-BTC)'),
               keyboardType: TextInputType.number,
               validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
             ),
@@ -884,7 +889,7 @@ class _EscrowSubTab extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: TextFormField(
                 controller: amtCtrl,
-                decoration: const InputDecoration(labelText: 'Amount (EJM)'),
+                decoration: const InputDecoration(labelText: '₵ Amount'),
                 keyboardType: TextInputType.number,
                 validator: (v) => v == null || v.isEmpty || double.tryParse(v) == null ? 'Invalid' : null,
               )),
