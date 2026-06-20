@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'wallet_screen.dart';
-import 'factory_screen.dart';
-import 'contracts_screen.dart';
+import 'wallet_exchange_screen.dart';
+import 'community_gov_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -16,9 +15,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = const [
-    WalletScreen(),
-    FactoryScreen(),
-    ContractsScreen(),
+    WalletExchangeScreen(),
+    CommunityGovScreen(),
     SettingsScreen(),
   ];
 
@@ -36,14 +34,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             label: 'Wallet',
           ),
           NavigationDestination(
-            icon: Icon(Icons.factory_outlined),
-            selectedIcon: Icon(Icons.factory),
-            label: 'Exchange',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.handshake_outlined),
-            selectedIcon: Icon(Icons.handshake),
-            label: 'Contracts',
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Community',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
