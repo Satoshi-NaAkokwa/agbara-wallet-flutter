@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bip39/bip39.dart' as bip39;
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/app_providers.dart';
+import '../services/wallet_storage.dart';
 import '../models/wallet.dart';
 
 // ─── EJM Symbol Widget ───
@@ -289,9 +290,27 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             const SizedBox(height: 12),
             Center(
               child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[300]!)),
-                child: QrImageView(data: w.address, version: QrVersions.auto, size: 160.0, backgroundColor: Colors.white),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF1B5E20), width: 3),
+                  boxShadow: [BoxShadow(color: const Color(0xFF1B5E20).withOpacity(0.15), blurRadius: 12, spreadRadius: 2)],
+                ),
+                child: QrImageView(
+                  data: w.address,
+                  version: QrVersions.auto,
+                  size: 160.0,
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF1B5E20),
+                  embeddedImage: const AssetImage('assets/images/ejm_symbol.png'),
+                  embeddedImageStyle: const QrEmbeddedImageStyle(
+                    size: Size(36, 36),
+                  ),
+                  errorStateBuilder: (ctx, err) => const Center(
+                    child: Text('QR Error', style: TextStyle(color: Colors.red)),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -322,7 +341,25 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                 icon: const Icon(Icons.copy, size: 16), label: const Text('Copy'),
               ),
               TextButton.icon(
-                onPressed: () async { final uri = Uri(scheme: 'bitcoin', path: w.address); if (await canLaunchUrl(uri)) await launchUrl(uri); },
+                onPressed: () async {
+                  final schemes = ['liquidnetwork', 'elements', 'bitcoin'];
+                  for (final scheme in schemes) {
+                    final uri = Uri.parse('$scheme:${w.address}');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      return;
+                    }
+                  }
+                  // Fallback: open block explorer
+                  final explorer = Uri.parse('https://blockstream.info/liquid/address/${w.address}');
+                  if (await canLaunchUrl(explorer)) {
+                    await launchUrl(explorer, mode: LaunchMode.externalApplication);
+                  } else {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('No wallet app found. Install a Liquid wallet.')),
+                    );
+                  }
+                },
                 icon: const Icon(Icons.open_in_new, size: 16), label: const Text('Open'),
               ),
             ]),
@@ -449,6 +486,8 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
       final mnemonic = bip39.generateMnemonic(strength: 128);
       final client = ref.read(apiClientProvider);
       final wallet = await client.createWallet(mnemonic, '');
+      // 🔐 Persist to encrypted storage
+      await WalletStorage.saveWallet(wallet, mnemonic);
       ref.read(walletProvider.notifier).state = wallet;
       ref.read(mnemonicProvider.notifier).state = mnemonic;
       await _refreshWallet(ref);
@@ -487,6 +526,8 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
           try {
             final client = ref.read(apiClientProvider);
             final w = await client.createWallet(ctrl.text.trim(), '');
+            // 🔐 Persist restored wallet
+            await WalletStorage.saveWallet(w, ctrl.text.trim());
             ref.read(walletProvider.notifier).state = w;
             ref.read(mnemonicProvider.notifier).state = ctrl.text.trim();
             await _refreshWallet(ref);

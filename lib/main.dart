@@ -14,6 +14,7 @@ class EjemmaWalletApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = ref.watch(darkModeProvider);
+    final restoreAsync = ref.watch(persistedWalletProvider);
     const seedColor = Color(0xFF1B5E20); // Deep green — Biafran identity
 
     return MaterialApp(
@@ -55,7 +56,34 @@ class EjemmaWalletApp extends ConsumerWidget {
         ),
       ),
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-      home: const HomeScreen(),
+      home: restoreAsync.when(
+        data: (_) => const HomeScreen(),
+        loading: () => const _SplashScreen(),
+        error: (_, __) => const HomeScreen(),
+      ),
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF1B5E20),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_balance_wallet, size: 64, color: Colors.white),
+            SizedBox(height: 16),
+            Text('EJEMMA', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+            SizedBox(height: 8),
+            Text('Loading wallet...', style: TextStyle(fontSize: 14, color: Colors.white70)),
+          ],
+        ),
+      ),
     );
   }
 }
