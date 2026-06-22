@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_providers.dart';
+import '../services/auth_service.dart';
+import '../services/pin_service.dart';
+import '../services/wallet_storage.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -65,7 +68,7 @@ class SettingsScreen extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showMnemonicReveal(context, mnemonic),
+                  onTap: () => _showMnemonicReveal(context, mnemonic, ref),
                 )
               else
                 ListTile(
@@ -116,12 +119,24 @@ class SettingsScreen extends ConsumerWidget {
             ]),
             const SizedBox(height: 20),
 
+            _buildSectionHeader(context, 'Security'),
+            _buildCard(context, [
+              ListTile(
+                leading: Icon(Icons.fingerprint, color: Theme.of(context).colorScheme.primary),
+                title: const Text('PIN / Biometric'),
+                subtitle: const Text('Secure wallet with PIN or device biometrics'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _promptSetPin(context, ref, ''),  // Re-use PIN setter
+              ),
+            ]),
+            const SizedBox(height: 20),
+
             _buildSectionHeader(context, 'About'),
             _buildCard(context, [
               ListTile(
                 leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
                 title: const Text('EJEMMA Wallet'),
-                subtitle: const Text('v0.2.1 • Production Release\nLiquid sidechain • Asset factory • Smart contracts'),
+                subtitle: const Text('v0.3.0 • Phase 1 Release\nSelf-custodial wallet • Asset factory • Smart contracts'),
               ),
               const Divider(height: 1, indent: 56),
               ListTile(
@@ -222,7 +237,48 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showMnemonicReveal(BuildContext context, String mnemonic) {
+  void _showMnemonicReveal(BuildContext context, String mnemonic, WidgetRef ref) async {
+    // Step 1: Try biometric authentication
+    final bioOk = await AuthService.canAuthenticate();
+    if (bioOk) {
+      final didAuth = await AuthService.authenticate(reason: 'Reveal your recovery phrase');
+      if (didAuth) {
+        if (!context.mounted) return;
+        _displayMnemonic(context, mnemonic);
+        return;
+      }
+    }
+
+    // Step 2: Fall back to PIN
+    final hasPin = await PinService.hasPin();
+    if (hasPin) {
+      if (!context.mounted) return;
+      final pin = await _showPinDialog(context);
+      if (pin == null) return;
+      try {
+        final ok = await PinService.verifyPin(pin);
+        if (ok && context.mounted) {
+          _displayMnemonic(context, mnemonic);
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Incorrect PIN')),
+          );
+        }
+      } on PinLockedException catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message)),
+          );
+        }
+      }
+    } else {
+      // Step 3: No PIN set — prompt to set one
+      if (!context.mounted) return;
+      _promptSetPin(context, ref, mnemonic);
+    }
+  }
+
+  void _displayMnemonic(BuildContext context, String mnemonic) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -295,7 +351,103 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmErase(BuildContext context, WidgetRef ref) {
+  Future<String?> _showPinDialog(BuildContext context) async {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter PIN'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'PIN', counterText: ''),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Unlock'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _promptSetPin(BuildContext context, WidgetRef ref, String mnemonic) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set PIN for Security'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Set a 6-digit PIN to protect your wallet. You can also enable biometrics in your device settings.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Enter PIN', counterText: ''),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final pin = ctrl.text.trim();
+              if (pin.length == 6) {
+                await PinService.setPin(pin);
+                Navigator.pop(ctx);
+                if (mnemonic.isNotEmpty) {
+                  _showMnemonicReveal(context, mnemonic, ref);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PIN set successfully')),
+                  );
+                }
+              }
+            },
+            child: const Text('Set PIN'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmErase(BuildContext context, WidgetRef ref) async {
+    // Require PIN/biometric before erase
+    final bioOk = await AuthService.canAuthenticate();
+    bool authorized = false;
+    if (bioOk) {
+      authorized = await AuthService.authenticate(reason: 'Erase wallet from device');
+    }
+    if (!authorized) {
+      final hasPin = await PinService.hasPin();
+      if (hasPin) {
+        final pin = await _showPinDialog(context);
+        if (pin != null) {
+          try { authorized = await PinService.verifyPin(pin); }
+          catch (_) {}
+        }
+      }
+    }
+    if (!authorized) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication required to erase wallet')),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -313,8 +465,11 @@ class SettingsScreen extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              // Clear all persistent data
+              await WalletStorage.clear();
+              await PinService.resetPin();
               ref.read(walletProvider.notifier).state = null;
               ref.read(mnemonicProvider.notifier).state = null;
               ref.read(balanceProvider.notifier).state = null;
@@ -352,24 +507,24 @@ class SettingsScreen extends ConsumerWidget {
               Text('Frequently Asked Questions', style: Theme.of(c).textTheme.headlineSmall),
               const SizedBox(height: 20),
               _faqItem(c, 'What is EJEMMA?', 
-                'EJEMMA (₵) is the official digital currency of the Biafran Government in Exile. It is issued on the Bitcoin Liquid sidechain, making it a real Bitcoin-backed asset with fast, confidential transactions.'),
+                'EJEMMA (₵) is the official digital currency of the Biafran Government in Exile. It is issued on the Bitcoin network, making it a real Bitcoin-backed asset with fast, confidential transactions.'),
               _faqItem(c, 'How do I receive ₵?',
                 'Tap "Create Wallet" to generate your unique address. Share your QR code or address with the sender. Your balance updates automatically when funds arrive.'),
               _faqItem(c, 'How do I send remittances?',
                 'Tap "Send", enter the recipient\'s Liquid address, the amount in ₵, and an optional memo. Tap "Broadcast" to submit the transaction to the network.'),
               _faqItem(c, 'What are transaction fees?',
-                'All ₵ transactions pay a small network fee in L-BTC (Liquid Bitcoin). The app automatically calculates and includes the optimal fee. P2P exchange and escrow have additional protocol fees of 0.1-0.3% paid in ₵.'),
+                'All ₵ transactions pay a small network fee in ₿. The app automatically calculates and includes the optimal fee. P2P exchange and escrow have additional protocol fees of 0.1-0.3% paid in ₵.'),
               _faqItem(c, 'Is my wallet secure?',
                 'Yes. EJEMMA is fully self-custodial. Your private keys are derived from your 12-word mnemonic. Only YOU have access. Write your mnemonic on paper and store it safely — it is the ONLY way to recover your wallet.'),
               _faqItem(c, 'Can I issue my own asset?',
-                'Yes. In the Wallet tab, tap "Issue New Asset" in the Asset Factory section. You can create custom tokens on the Liquid sidechain with your chosen ticker, supply, and precision.'),
+                'Yes. In the Wallet tab, tap "Issue New Asset" in the Asset Factory section. You can create custom tokens with your chosen ticker, supply, and precision.'),
               _faqItem(c, 'What is ROSCA?',
                 'ROSCA (Rotating Savings and Credit Association) is a traditional group savings model. Members contribute ₵ each round, and one member receives the full pot. It is enforced by smart contracts.'),
               _faqItem(c, 'How does governance work?',
                 'Every ₵ holder can vote on proposals. 1 ₵ = 1 vote. Proposals can allocate treasury funds, change fees, or update protocol parameters. Voting power equals your liquid ₵ balance.'),
               _faqItem(c, 'What if I lose my phone?',
                 'Restore your wallet on any device using your 12-word mnemonic. Go to Settings > Reveal Mnemonic to view it. NEVER store your mnemonic digitally — write it on paper only.'),
-              _faqItem(c, 'How do I swap ₵ for L-BTC?',
+              _faqItem(c, 'How do I swap ₵?',
                 'The Quick Swap feature in the Wallet tab allows instant conversion. For larger trades, use the P2P Exchange tab to find counterparty orders.'),
               _faqItem(c, 'Who controls my assets?',
                 'NO ONE except you. EJEMMA is non-custodial. The Biafran Government in Exile can issue assets and set protocol rules, but cannot access, freeze, or confiscate your funds.'),
@@ -412,13 +567,13 @@ class SettingsScreen extends ConsumerWidget {
                 'Wallet data is stored using AES-256-GCM encryption with Argon2 key derivation. Even if your device is compromised, the attacker cannot extract your keys without your knowledge.',
                 Icons.enhanced_encryption),
               _securityItem(c, 'Asset Issuance Security',
-                'All issued assets are anchored to the Bitcoin blockchain via the Liquid sidechain. Asset IDs are deterministic and cryptographically verifiable. The issuer contract is immutable once deployed.',
+                'All issued assets are anchored to the Bitcoin blockchain. Asset IDs are deterministic and cryptographically verifiable. The issuer contract is immutable once deployed.',
                 Icons.verified),
               _securityItem(c, 'Transaction Validation',
-                'Every transaction is signed locally on your device, then broadcast to the Liquid network. The daemon validates but never signs — you retain exclusive signing authority.',
+                'Every transaction is signed locally on your device, then broadcast to the network. The daemon validates but never signs — you retain exclusive signing authority.',
                 Icons.check_circle),
               _securityItem(c, 'Fee Structure',
-                'Network fees: Paid in L-BTC to Liquid miners.\nProtocol fees: Paid in ₵ to the treasury.\nEscrow fees: 0.2% paid to escrow agents.\nNo hidden fees. All rates are transparent and on-chain.',
+                'Network fees: Paid in ₿ to network validators.\nProtocol fees: Paid in ₵ to the treasury.\nEscrow fees: 0.2% paid to escrow agents.\nNo hidden fees. All rates are transparent and on-chain.',
                 Icons.attach_money),
               _securityItem(c, 'Recovery Process',
                 'If your device is lost, stolen, or damaged: Install EJEMMA on a new device, select "Restore from Mnemonic", enter your 12 words in order, and your full balance reappears instantly.',

@@ -86,7 +86,7 @@ class ApiClient {
     }
   }
 
-  Future<IssuedAsset> issueAsset({
+  Future<Map<String, dynamic>> issueAsset({
     required String ticker,
     required int precision,
     required int initialSupply,
@@ -103,7 +103,7 @@ class ApiClient {
       }),
     );
     if (response.statusCode == 200) {
-      return IssuedAsset.fromJson(jsonDecode(response.body));
+      return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
       throw ApiException('${response.statusCode}: ${response.body}');
     }
@@ -134,5 +134,50 @@ class ApiClient {
     } else {
       throw ApiException('health check failed: ${response.statusCode}');
     }
+  }
+
+  // ─── Fee Estimation ───
+  Future<Map<String, dynamic>> estimateFee(FeePreset preset) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/fee-estimate/${preset.targetBlocks}'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      // Fallback: return default fee rates
+      return {
+        'fee_rate_sats_per_byte': preset == FeePreset.save ? 1 : preset == FeePreset.standard ? 3 : 10,
+        'estimated_time_minutes': preset == FeePreset.save ? 10 : preset == FeePreset.standard ? 3 : 1,
+      };
+    }
+  }
+
+  // ─── Asset Registry ───
+  Future<Asset?> getAssetInfo(String assetId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/registry/asset/$assetId'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return Asset.fromJson(jsonDecode(response.body));
+    }
+    return null;
+  }
+
+  Future<List<Asset>> getRegisteredAssets() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/registry/assets'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      if (body is List) return body.map((e) => Asset.fromJson(e)).toList();
+      if (body is Map && body.containsKey('assets')) {
+        final list = body['assets'];
+        if (list is List) return list.map((e) => Asset.fromJson(e)).toList();
+      }
+    }
+    return [];
   }
 }

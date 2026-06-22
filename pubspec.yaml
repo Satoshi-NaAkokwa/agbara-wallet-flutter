@@ -1,7 +1,7 @@
 name: ejemma_wallet
 description: Biafran Remittance Wallet - EJEMMA Currency and token factory
 publish_to: 'none'
-version: 0.2.5+8
+version: 0.3.0+9
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -19,6 +19,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   url_launcher: ^6.2.6
   flutter_secure_storage: ^9.2.2
+  local_auth: ^2.2.0
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

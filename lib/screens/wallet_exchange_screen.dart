@@ -203,73 +203,186 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
     final ejm = bal?['ejm']?.toString();
     final assets = bal?['assets'] as List<dynamic>? ?? [];
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                child: EjmSymbol(size: 24, color: Theme.of(ctx).colorScheme.primary),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFF1B5E20), const Color(0xFF2E7D32)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1B5E20).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total Balance',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'EJEMMA',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Total Balance', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
-                Text('EJEMMA', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              ]),
-            ]),
-            const SizedBox(height: 16),
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Testnet',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
               if (ejm != null) ...[
-                EjmAmount(
-                  amount: ejm,
-                  showSymbol: true,
-                  symbolSize: 28,
-                  style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary),
+                Text(
+                  ejm,
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 8),
-                Text('EJM', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '₵EJM',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ] else ...[
-                Text(lbtc, style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary)),
+                Text(
+                  lbtc,
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Text('L-BTC (regtest)', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '₿',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ],
-            ]),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.warning_amber, size: 14, color: Colors.orange[700]),
-                const SizedBox(width: 6),
-                Text('REGTEST MODE — Not real money', style: TextStyle(fontSize: 11, color: Colors.orange[700], fontWeight: FontWeight.w600)),
-              ]),
-            ),
-            if (assets.length > 1) ...[
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text('Assets', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
-              const SizedBox(height: 4),
-              ...assets.where((a) => a['ticker'] != 'L-BTC').map((a) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(children: [
-                  Text(a['ticker'] ?? a['asset_id']?.toString().substring(0, 8) ?? 'Asset', style: const TextStyle(fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  Text(a['balance']?.toString() ?? '0', style: TextStyle(color: Theme.of(ctx).colorScheme.primary)),
-                ]),
-              )),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '~\$0.00 USD',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 13,
+            ),
+          ),
+          if (assets.length > 1) ...[
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white24),
+            const SizedBox(height: 8),
+            Text(
+              'Assets',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...assets.where((a) => a['ticker'] != 'L-BTC').map((a) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.white70,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    a['ticker'] ?? a['asset_id']?.toString().substring(0, 8) ?? 'Asset',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    a['balance']?.toString() ?? '0',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            )),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -350,15 +463,10 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                       return;
                     }
                   }
-                  // Fallback: open block explorer
-                  final explorer = Uri.parse('https://blockstream.info/liquid/address/${w.address}');
-                  if (await canLaunchUrl(explorer)) {
-                    await launchUrl(explorer, mode: LaunchMode.externalApplication);
-                  } else {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('No wallet app found. Install a Liquid wallet.')),
-                    );
-                  }
+                  // Fallback: show internal transaction detail instead of external explorer
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('No wallet app found. Copy address and paste into your wallet.')),
+                  );
                 },
                 icon: const Icon(Icons.open_in_new, size: 16), label: const Text('Open'),
               ),
@@ -403,7 +511,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
               Text('Asset Factory', style: Theme.of(ctx).textTheme.titleMedium),
             ]),
             const SizedBox(height: 8),
-            Text('Issue new assets on the Liquid sidechain', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            Text('Issue new assets on the EJEMMA network', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _showIssueAssetSheet(ctx, ref),
@@ -776,7 +884,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                   );
                   showDialog(context: ctx, builder: (c2) => AlertDialog(
                     title: const Text('Asset Issued'),
-                    content: SelectableText('Asset ID: ${asset.assetId}\nTx ID: ${asset.txid}'),
+                    content: SelectableText('Asset ID: ${asset['assetId']}\nTx ID: ${asset['txid']}'),
                     actions: [TextButton(onPressed: () => Navigator.pop(c2), child: const Text('OK'))],
                   ));
                 } catch (e) {
