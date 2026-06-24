@@ -18,6 +18,9 @@ final isLoadingProvider = StateProvider<bool>((ref) => false);
 /// Error message display
 final errorProvider = StateProvider<String?>((ref) => null);
 
+/// Biometric unlock enabled (stored per-session only; persist in secure storage if needed)
+final biometricEnabledProvider = StateProvider<bool>((ref) => false);
+
 /// Balance cache
 final balanceProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
 
@@ -33,9 +36,11 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 final persistedWalletProvider = FutureProvider<void>((ref) async {
   final wallet = await WalletStorage.loadWallet();
   final mnemonic = await WalletStorage.loadMnemonic();
+  final bioEnabled = await WalletStorage.isBiometricEnabled();
   if (wallet != null && mnemonic != null) {
     ref.read(walletProvider.notifier).state = wallet;
     ref.read(mnemonicProvider.notifier).state = mnemonic;
+    ref.read(biometricEnabledProvider.notifier).state = bioEnabled;
     // Auto-refresh balance
     try {
       final client = ref.read(apiClientProvider);

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "what-is-ejemma",
+    "category": "Basics",
+    "question": "What is EJEMMA?",
+    "answer": "EJEMMA (₵) is the official digital currency of the Biafran Government in Exile. It is issued on the Bitcoin network via the Liquid sidechain, making it a real Bitcoin-backed asset with fast, confidential transactions."
+  },
+  {
+    "id": "how-to-receive",
+    "category": "Wallet",
+    "question": "How do I receive ₵?",
+    "answer": "Tap 'Create Wallet' to generate your unique address. Share your QR code or address with the sender. Your balance updates automatically when funds arrive."
+  },
+  {
+    "id": "how-to-send",
+    "category": "Wallet",
+    "question": "How do I send remittances?",
+    "answer": "Tap 'Send', enter the recipient's Liquid address, the amount in ₵, and an optional memo. Choose a fee preset (Save, Standard, Express) and tap 'Broadcast'."
+  },
+  {
+    "id": "transaction-fees",
+    "category": "Wallet",
+    "question": "What are transaction fees?",
+    "answer": "All ₵ transactions pay a small network fee in ₿ to network validators. The app automatically calculates and includes the optimal fee. P2P exchange and escrow have additional protocol fees of 0.1-0.3% paid in ₵."
+  },
+  {
+    "id": "is-wallet-secure",
+    "category": "Security",
+    "question": "Is my wallet secure?",
+    "answer": "Yes. EJEMMA is fully self-custodial. Your private keys are derived from your 12-word mnemonic. Only YOU have access. Write your mnemonic on paper and store it safely — it is the ONLY way to recover your wallet."
+  },
+  {
+    "id": "issue-asset",
+    "category": "Factory",
+    "question": "Can I issue my own asset?",
+    "answer": "Yes. In the Wallet tab, tap 'Issue New Asset' in the Asset Factory section. You can create custom tokens with your chosen ticker, supply, and precision. A small network fee applies."
+  },
+  {
+    "id": "what-is-rosca",
+    "category": "Community",
+    "question": "What is ROSCA?",
+    "answer": "ROSCA (Rotating Savings and Credit Association) is a traditional group savings model. Members contribute ₵ each round, and one member receives the full pot. It is enforced by smart contracts."
+  },
+  {
+    "id": "governance",
+    "category": "Community",
+    "question": "How does governance work?",
+    "answer": "Every ₵ holder can vote on proposals. 1 ₵ = 1 vote. Proposals can allocate treasury funds, change fees, or update protocol parameters. Voting power equals your liquid ₵ balance."
+  },
+  {
+    "id": "lost-phone",
+    "category": "Security",
+    "question": "What if I lose my phone?",
+    "answer": "Restore your wallet on any device using your 12-word mnemonic. Go to Settings > Reveal Mnemonic to view it. NEVER store your mnemonic digitally — write it on paper only."
+  },
+  {
+    "id": "how-to-swap",
+    "category": "Exchange",
+    "question": "How do I swap ₵?",
+    "answer": "The Quick Swap feature in the Wallet tab allows instant conversion. For larger trades, use the P2P Exchange tab to find counterparty orders and escrow-protected swaps."
+  },
+  {
+    "id": "who-controls-assets",
+    "category": "Security",
+    "question": "Who controls my assets?",
+    "answer": "NO ONE except you. EJEMMA is non-custodial. The Biafran Government in Exile can issue assets and set protocol rules, but cannot access, freeze, or confiscate your funds."
+  },
+  {
+    "id": "what-is-liquid",
+    "category": "Technology",
+    "question": "What is the Liquid sidechain?",
+    "answer": "Liquid is a Bitcoin sidechain that enables faster, more confidential transactions and token issuance while maintaining a peg to Bitcoin. EJEMMA runs on Liquid to deliver near-instant remittances."
+  },
+  {
+    "id": "what-is-mnemonic",
+    "category": "Security",
+    "question": "What is a mnemonic?",
+    "answer": "A mnemonic (seed phrase) is a human-readable representation of your cryptographic private key. EJEMMA uses 12 BIP-39 words. Anyone with these words controls your wallet. Keep them secret."
+  },
+  {
+    "id": "network-badge",
+    "category": "Wallet",
+    "question": "What does 'Testnet' mean?",
+    "answer": "The current version runs on Liquid testnet/regtest. Funds are not real. This allows safe testing before mainnet migration. A future update will switch to Liquid mainnet with real Bitcoin-pegged assets."
+  }
+]

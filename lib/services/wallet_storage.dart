@@ -14,6 +14,7 @@ class WalletStorage {
 
   static const _keyWallet = 'ejemma_wallet_v1';
   static const _keyMnemonic = 'ejemma_mnemonic_v1';
+  static const _keyBiometric = 'ejemma_biometric_enabled';
 
   /// Save wallet + mnemonic to encrypted storage
   static Future<void> saveWallet(WalletInfo wallet, String mnemonic) async {
@@ -49,10 +50,22 @@ class WalletStorage {
     return await _storage.read(key: _keyMnemonic);
   }
 
+  /// Persist biometric unlock preference
+  static Future<void> setBiometricEnabled(bool enabled) async {
+    await _storage.write(key: _keyBiometric, value: enabled ? '1' : '0');
+  }
+
+  /// Read biometric unlock preference
+  static Future<bool> isBiometricEnabled() async {
+    final v = await _storage.read(key: _keyBiometric);
+    return v == '1';
+  }
+
   /// Clear all wallet data (erase)
   static Future<void> clear() async {
     await _storage.delete(key: _keyWallet);
     await _storage.delete(key: _keyMnemonic);
+    await _storage.delete(key: _keyBiometric);
   }
 
   /// Check if a wallet exists in storage

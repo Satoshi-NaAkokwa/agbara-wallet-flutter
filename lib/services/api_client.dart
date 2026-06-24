@@ -136,48 +136,17 @@ class ApiClient {
     }
   }
 
-  // ─── Fee Estimation ───
-  Future<Map<String, dynamic>> estimateFee(FeePreset preset) async {
+  Future<int> estimateFee(String presetName) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/fee-estimate/${preset.targetBlocks}'),
+      Uri.parse('\$baseUrl/fee-estimate/\$presetName'),
       headers: {'Content-Type': 'application/json'},
     );
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    } else {
-      // Fallback: return default fee rates
-      return {
-        'fee_rate_sats_per_byte': preset == FeePreset.save ? 1 : preset == FeePreset.standard ? 3 : 10,
-        'estimated_time_minutes': preset == FeePreset.save ? 10 : preset == FeePreset.standard ? 3 : 1,
-      };
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return (body['fee_rate_sats_per_byte'] ?? body['fee'] ?? 3).toInt();
     }
-  }
-
-  // ─── Asset Registry ───
-  Future<Asset?> getAssetInfo(String assetId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/registry/asset/$assetId'),
-      headers: {'Content-Type': 'application/json'},
-    );
-    if (response.statusCode == 200) {
-      return Asset.fromJson(jsonDecode(response.body));
-    }
-    return null;
-  }
-
-  Future<List<Asset>> getRegisteredAssets() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/registry/assets'),
-      headers: {'Content-Type': 'application/json'},
-    );
-    if (response.statusCode == 200) {
-      final body = jsonDecode(response.body);
-      if (body is List) return body.map((e) => Asset.fromJson(e)).toList();
-      if (body is Map && body.containsKey('assets')) {
-        final list = body['assets'];
-        if (list is List) return list.map((e) => Asset.fromJson(e)).toList();
-      }
-    }
-    return [];
+    // Fallback defaults
+    final fallback = {'save': 1, 'standard': 3, 'express': 10};
+    return fallback[presetName.toLowerCase()] ?? 3;
   }
 }

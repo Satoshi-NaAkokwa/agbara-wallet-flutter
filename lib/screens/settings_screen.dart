@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,8 @@ import '../providers/app_providers.dart';
 import '../services/auth_service.dart';
 import '../services/pin_service.dart';
 import '../services/wallet_storage.dart';
+
+final biometricEnabledProvider = StateProvider<bool>((ref) => false);
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -126,7 +129,43 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text('PIN / Biometric'),
                 subtitle: const Text('Secure wallet with PIN or device biometrics'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => _promptSetPin(context, ref, ''),  // Re-use PIN setter
+                onTap: () => _promptSetPin(context, ref, mnemonic ?? ''),
+              ),
+              const Divider(height: 1, indent: 56),
+              Consumer(
+                builder: (context, ref, child) {
+                  final bioEnabled = ref.watch(biometricEnabledProvider);
+                  return SwitchListTile(
+                    secondary: Icon(Icons.fingerprint, color: Theme.of(context).colorScheme.primary),
+                    title: const Text('Unlock with Biometrics'),
+                    subtitle: const Text('Use fingerprint/face to unlock app'),
+                    value: bioEnabled,
+                    onChanged: (v) async {
+                      if (v) {
+                        final ok = await AuthService.canAuthenticate();
+                        if (!ok) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('No biometrics enrolled on this device')),
+                            );
+                          }
+                          return;
+                        }
+                        final didAuth = await AuthService.authenticate(reason: 'Enable biometric unlock');
+                        if (didAuth && context.mounted) {
+                          await WalletStorage.setBiometricEnabled(true);
+                          ref.read(biometricEnabledProvider.notifier).state = true;
+                          if (!(await PinService.hasPin())) {
+                            _promptSetPin(context, ref, mnemonic ?? '');
+                          }
+                        }
+                      } else {
+                        await WalletStorage.setBiometricEnabled(false);
+                        ref.read(biometricEnabledProvider.notifier).state = false;
+                      }
+                    },
+                  );
+                },
               ),
             ]),
             const SizedBox(height: 20),
@@ -136,7 +175,7 @@ class SettingsScreen extends ConsumerWidget {
               ListTile(
                 leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
                 title: const Text('EJEMMA Wallet'),
-                subtitle: const Text('v0.3.0 • Phase 1 Release\nSelf-custodial wallet • Asset factory • Smart contracts'),
+                subtitle: const Text('v0.4.1 • Phase 1 Release\nSelf-custodial wallet • Asset factory • Smart contracts'),
               ),
               const Divider(height: 1, indent: 56),
               ListTile(
@@ -356,23 +395,39 @@ class SettingsScreen extends ConsumerWidget {
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Enter PIN'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'PIN', counterText: ''),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Unlock'),
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Enter PIN'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            maxLength: 6,
+            obscureText: true,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'PIN',
+              counterText: '',
+              hintText: '••••••',
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (ctx.mounted) Navigator.pop(ctx, ctrl.text.trim());
+              },
+              child: const Text('Unlock'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -381,43 +436,61 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Set PIN for Security'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Set a 6-digit PIN to protect your wallet. You can also enable biometrics in your device settings.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Enter PIN', counterText: ''),
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Set PIN for Security'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Set a 6-digit PIN to protect your wallet. You can also enable biometrics in your device settings.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 6,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Enter PIN',
+                  counterText: '',
+                  hintText: '••••••',
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final pin = ctrl.text.trim();
+                if (pin.length == 6) {
+                  await PinService.setPin(pin);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mnemonic.isNotEmpty) {
+                    if (context.mounted) {
+                      _showMnemonicReveal(context, mnemonic, ref);
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('PIN set successfully')),
+                      );
+                    }
+                  }
+                }
+              },
+              child: const Text('Set PIN'),
             ),
           ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final pin = ctrl.text.trim();
-              if (pin.length == 6) {
-                await PinService.setPin(pin);
-                Navigator.pop(ctx);
-                if (mnemonic.isNotEmpty) {
-                  _showMnemonicReveal(context, mnemonic, ref);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PIN set successfully')),
-                  );
-                }
-              }
-            },
-            child: const Text('Set PIN'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -494,45 +567,7 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (c) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        maxChildSize: 0.95,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (_, scrollCtrl) => Container(
-          padding: const EdgeInsets.all(20),
-          child: ListView(
-            controller: scrollCtrl,
-            children: [
-              Text('Frequently Asked Questions', style: Theme.of(c).textTheme.headlineSmall),
-              const SizedBox(height: 20),
-              _faqItem(c, 'What is EJEMMA?', 
-                'EJEMMA (₵) is the official digital currency of the Biafran Government in Exile. It is issued on the Bitcoin network, making it a real Bitcoin-backed asset with fast, confidential transactions.'),
-              _faqItem(c, 'How do I receive ₵?',
-                'Tap "Create Wallet" to generate your unique address. Share your QR code or address with the sender. Your balance updates automatically when funds arrive.'),
-              _faqItem(c, 'How do I send remittances?',
-                'Tap "Send", enter the recipient\'s Liquid address, the amount in ₵, and an optional memo. Tap "Broadcast" to submit the transaction to the network.'),
-              _faqItem(c, 'What are transaction fees?',
-                'All ₵ transactions pay a small network fee in ₿. The app automatically calculates and includes the optimal fee. P2P exchange and escrow have additional protocol fees of 0.1-0.3% paid in ₵.'),
-              _faqItem(c, 'Is my wallet secure?',
-                'Yes. EJEMMA is fully self-custodial. Your private keys are derived from your 12-word mnemonic. Only YOU have access. Write your mnemonic on paper and store it safely — it is the ONLY way to recover your wallet.'),
-              _faqItem(c, 'Can I issue my own asset?',
-                'Yes. In the Wallet tab, tap "Issue New Asset" in the Asset Factory section. You can create custom tokens with your chosen ticker, supply, and precision.'),
-              _faqItem(c, 'What is ROSCA?',
-                'ROSCA (Rotating Savings and Credit Association) is a traditional group savings model. Members contribute ₵ each round, and one member receives the full pot. It is enforced by smart contracts.'),
-              _faqItem(c, 'How does governance work?',
-                'Every ₵ holder can vote on proposals. 1 ₵ = 1 vote. Proposals can allocate treasury funds, change fees, or update protocol parameters. Voting power equals your liquid ₵ balance.'),
-              _faqItem(c, 'What if I lose my phone?',
-                'Restore your wallet on any device using your 12-word mnemonic. Go to Settings > Reveal Mnemonic to view it. NEVER store your mnemonic digitally — write it on paper only.'),
-              _faqItem(c, 'How do I swap ₵?',
-                'The Quick Swap feature in the Wallet tab allows instant conversion. For larger trades, use the P2P Exchange tab to find counterparty orders.'),
-              _faqItem(c, 'Who controls my assets?',
-                'NO ONE except you. EJEMMA is non-custodial. The Biafran Government in Exile can issue assets and set protocol rules, but cannot access, freeze, or confiscate your funds.'),
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
+      builder: (c) => const _FaqSheet(),
     );
   }
 
@@ -647,4 +682,109 @@ class SettingsScreen extends ConsumerWidget {
       ]),
     );
   }
+}
+
+
+class _FaqSheet extends StatefulWidget {
+  const _FaqSheet();
+
+  @override
+  State<_FaqSheet> createState() => _FaqSheetState();
+}
+
+class _FaqSheetState extends State<_FaqSheet> {
+  List<Map<String, dynamic>> _all = [];
+  List<Map<String, dynamic>> _filtered = [];
+  final _ctrl = TextEditingController();
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final raw = await rootBundle.loadString('assets/data/faq.json');
+      final list = jsonDecode(raw) as List<dynamic>;
+      if (mounted) setState(() {
+        _all = list.cast<Map<String, dynamic>>();
+        _filtered = List.from(_all);
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; });
+    }
+  }
+
+  void _filter(String q) {
+    final lower = q.toLowerCase();
+    setState(() {
+      _filtered = _all.where((f) {
+        final qn = (f['question'] ?? '').toString().toLowerCase();
+        final ans = (f['answer'] ?? '').toString().toLowerCase();
+        final cat = (f['category'] ?? '').toString().toLowerCase();
+        return qn.contains(lower) || ans.contains(lower) || cat.contains(lower);
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (_, scrollCtrl) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('Help Center', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+          ]),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ctrl,
+            onChanged: _filter,
+            decoration: InputDecoration(
+              hintText: 'Search questions...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _ctrl.text.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () { _ctrl.clear(); _filter(''); }) : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _filtered.isEmpty
+                    ? const Center(child: Text('No matching questions'))
+                    : ListView(
+                        controller: scrollCtrl,
+                        children: _filtered.map((f) => _faqSheetItem(context, f)).toList(),
+                      ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+
+Widget _faqSheetItem(BuildContext context, Map<String, dynamic> f) {
+  return Card(
+    margin: const EdgeInsets.only(bottom: 10),
+    child: ExpansionTile(
+      title: Text(f['question'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(f['category'] ?? '', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary)),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Text(f['answer'] ?? '', style: TextStyle(color: Colors.grey[700], height: 1.4)),
+        ),
+      ],
+    ),
+  );
 }

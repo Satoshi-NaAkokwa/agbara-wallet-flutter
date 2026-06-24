@@ -1,0 +1,31 @@
+{
+    "name": "EJEMMA Wallet",
+    "short_name": "EJEMMA",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0D3B10",
+    "theme_color": "#1B5E20",
+    "description": "Self-custodial wallet for the Biafran Government in Exile",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "purpose": "maskable"
+        }
+    ]
+}

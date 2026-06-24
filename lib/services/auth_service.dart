@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:local_auth_android/local_auth_android.dart';
 
 /// Biometric + PIN authentication for sensitive operations
 /// Handles all platforms gracefully with proper error codes
@@ -42,8 +41,7 @@ class AuthService {
           sensitiveTransaction: true,
         ),
       );
-    } on PlatformException catch (e) {
-      print('Auth error: ${e.code} - ${e.message}');
+    } on PlatformException catch (_) {
       return false;
     }
   }

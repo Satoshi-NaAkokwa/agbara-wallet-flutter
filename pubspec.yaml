@@ -1,7 +1,7 @@
 name: ejemma_wallet
 description: Biafran Remittance Wallet - EJEMMA Currency and token factory
 publish_to: 'none'
-version: 0.3.0+9
+version: 0.4.1+11
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

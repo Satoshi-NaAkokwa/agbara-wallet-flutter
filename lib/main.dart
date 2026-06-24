@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/app_providers.dart';
-import 'screens/home_screen.dart';
+import 'screens/unlock_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,9 +57,9 @@ class EjemmaWalletApp extends ConsumerWidget {
       ),
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       home: restoreAsync.when(
-        data: (_) => const HomeScreen(),
+        data: (_) => const UnlockGate(),
         loading: () => const _SplashScreen(),
-        error: (_, __) => const HomeScreen(),
+        error: (_, __) => const UnlockGate(),
       ),
     );
   }
