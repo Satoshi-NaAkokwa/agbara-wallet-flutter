@@ -476,15 +476,15 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final schemes = ['bitcoin', 'liquidnetwork', 'elements'];
-                  for (final scheme in schemes) {
-                    final uri = Uri.parse('$scheme:${w.address}');
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      return;
+                  final url = 'https://blockstream.info/liquidtestnet/address/${w.address}';
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Could not open explorer for ${w.address}')));
                     }
                   }
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('No wallet app found. Copy address instead.')));
                 },
                 icon: const Icon(Icons.open_in_new, size: 18),
                 label: const Text('Open'),

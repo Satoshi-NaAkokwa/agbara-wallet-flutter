@@ -10,11 +10,29 @@ import '../services/wallet_storage.dart';
 
 final biometricEnabledProvider = StateProvider<bool>((ref) => false);
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricPreference();
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    final enabled = await WalletStorage.isBiometricEnabled();
+    if (mounted) {
+      ref.read(biometricEnabledProvider.notifier).state = enabled;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = ref.watch(darkModeProvider);
     final client = ref.read(apiClientProvider);
     final mnemonic = ref.watch(mnemonicProvider);
@@ -132,39 +150,38 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () => _promptSetPin(context, ref, mnemonic ?? ''),
               ),
               const Divider(height: 1, indent: 56),
-              Consumer(
-                builder: (context, ref, child) {
-                  final bioEnabled = ref.watch(biometricEnabledProvider);
-                  return SwitchListTile(
-                    secondary: Icon(Icons.fingerprint, color: Theme.of(context).colorScheme.primary),
-                    title: const Text('Unlock with Biometrics'),
-                    subtitle: const Text('Use fingerprint/face to unlock app'),
-                    value: bioEnabled,
-                    onChanged: (v) async {
-                      if (v) {
-                        final ok = await AuthService.canAuthenticate();
-                        if (!ok) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('No biometrics enrolled on this device')),
-                            );
-                          }
-                          return;
-                        }
-                        final didAuth = await AuthService.authenticate(reason: 'Enable biometric unlock');
-                        if (didAuth && context.mounted) {
-                          await WalletStorage.setBiometricEnabled(true);
-                          ref.read(biometricEnabledProvider.notifier).state = true;
-                          if (!(await PinService.hasPin())) {
-                            _promptSetPin(context, ref, mnemonic ?? '');
-                          }
-                        }
-                      } else {
-                        await WalletStorage.setBiometricEnabled(false);
-                        ref.read(biometricEnabledProvider.notifier).state = false;
+              SwitchListTile(
+                secondary: Icon(Icons.fingerprint, color: Theme.of(context).colorScheme.primary),
+                title: const Text('Unlock with Biometrics'),
+                subtitle: const Text('Use fingerprint/face to unlock app'),
+                value: ref.watch(biometricEnabledProvider),
+                onChanged: (v) async {
+                  if (v) {
+                    final ok = await AuthService.canAuthenticate();
+                    if (!ok) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No biometrics enrolled on this device')),
+                        );
                       }
-                    },
-                  );
+                      return;
+                    }
+                    final didAuth = await AuthService.authenticate(reason: 'Enable biometric unlock');
+                    if (didAuth) {
+                      await WalletStorage.setBiometricEnabled(true);
+                      if (mounted) {
+                        ref.read(biometricEnabledProvider.notifier).state = true;
+                        if (!(await PinService.hasPin())) {
+                          _promptSetPin(context, ref, mnemonic ?? '');
+                        }
+                      }
+                    }
+                  } else {
+                    await WalletStorage.setBiometricEnabled(false);
+                    if (mounted) {
+                      ref.read(biometricEnabledProvider.notifier).state = false;
+                    }
+                  }
                 },
               ),
             ]),
