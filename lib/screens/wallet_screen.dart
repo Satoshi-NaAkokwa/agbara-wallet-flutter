@@ -847,7 +847,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                     }
                     await _refreshWallet(ref);
                   } catch (e) {
-                    ref.read(errorProvider.notifier).state = 'Send failed: \$e';
+                    ref.read(errorProvider.notifier).state = 'Send failed: $e';
                   } finally {
                     ref.read(isLoadingProvider.notifier).state = false;
                   }

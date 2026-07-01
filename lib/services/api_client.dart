@@ -138,7 +138,7 @@ class ApiClient {
 
   Future<int> estimateFee(String presetName) async {
     final response = await http.get(
-      Uri.parse('\$baseUrl/fee-estimate/\$presetName'),
+      Uri.parse('$baseUrl/fee-estimate/$presetName'),
       headers: {'Content-Type': 'application/json'},
     );
     if (response.statusCode == 200) {

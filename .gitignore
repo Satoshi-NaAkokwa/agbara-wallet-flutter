@@ -16,3 +16,8 @@ ios/.symlinks/
 android/app/debug
 android/app/profile
 android/app/release
+android/keystore.properties
+android/key.properties
+*.keystore
+*.jks
+!debug.keystore
