@@ -56,7 +56,8 @@ jobs:
 
       - name: Verify signature
         run: |
-          $ANDROID_HOME/build-tools/*/apksigner verify -v build/app/outputs/flutter-apk/app-release.apk
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner -type f | sort -V | tail -1)
+          $APKSIGNER verify --verbose build/app/outputs/flutter-apk/app-release.apk
 
       - name: Rename APK
         run: |
