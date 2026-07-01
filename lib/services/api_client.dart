@@ -12,6 +12,7 @@ class ApiException implements Exception {
 class ApiClient {
   static const String _defaultDaemonBase = 'https://wallet.ugogbe.info/daemon/v1';
   static const String _defaultApiBase = 'https://wallet.ugogbe.info/api/v1';
+  static const String _apiKey = 'ejemma_dev_key_2026';
 
   final String baseUrl;
   final String apiBaseUrl;
@@ -20,10 +21,15 @@ class ApiClient {
       : baseUrl = baseUrl ?? _defaultDaemonBase,
         apiBaseUrl = apiBaseUrl ?? _defaultApiBase;
 
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'x-api-key': _apiKey,
+  };
+
   Future<WalletInfo> createWallet(String mnemonic, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/wallet'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({'mnemonic': mnemonic, 'password': password}),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -36,7 +42,7 @@ class ApiClient {
   Future<Map<String, dynamic>> getBalance(String address) async {
     final response = await http.get(
       Uri.parse('$baseUrl/balance/$address'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -54,7 +60,7 @@ class ApiClient {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/send'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'from_address': fromAddress,
         'to_address': toAddress,
@@ -74,7 +80,7 @@ class ApiClient {
   Future<List<Map<String, dynamic>>> getTransactions(String address) async {
     final response = await http.get(
       Uri.parse('$baseUrl/transactions/$address'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       final list = jsonDecode(response.body);
@@ -93,7 +99,7 @@ class ApiClient {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/factory/assets'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'ticker': ticker,
         'precision': precision,
@@ -111,7 +117,7 @@ class ApiClient {
   Future<List<Map<String, dynamic>>> listAssets() async {
     final response = await http.get(
       Uri.parse('$baseUrl/factory/assets'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body);
@@ -127,7 +133,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> health() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/health'));
+    final response = await http.get(Uri.parse('$apiBaseUrl/health'), headers: _headers);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
@@ -138,7 +144,7 @@ class ApiClient {
   Future<int> estimateFee(String presetName) async {
     final response = await http.get(
       Uri.parse('$baseUrl/fee-estimate/$presetName'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body) as Map<String, dynamic>;

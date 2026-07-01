@@ -177,6 +177,8 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
     final lbtc = bal?['lbtc']?.toString() ?? '0.00000000';
     final ejm = bal?['ejm']?.toString();
     final assets = bal?['assets'] as List<dynamic>? ?? [];
+    // EJM-first: always show ₵ as primary balance, ₿ as secondary fuel balance
+    final ejmDisplay = ejm ?? '0';
 
     return Container(
       decoration: BoxDecoration(
@@ -205,19 +207,11 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Total Balance',
+                    'EJEMMA Balance',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'EJEMMA',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -254,62 +248,67 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             ],
           ),
           const SizedBox(height: 20),
+          // Primary: EJM (₵)
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (ejm != null) ...[
-                Text(
-                  ejm,
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              Text(
+                ejmDisplay,
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '₵',
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    '₵EJM',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white.withOpacity(0.8),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ] else ...[
-                Text(
-                  lbtc,
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    '₿',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white.withOpacity(0.8),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '~\$0.00 USD',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 13,
-            ),
+          // Secondary: L-BTC fuel balance (abstracted as "Network Fee Reserve")
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.4),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Fuel (L-BTC): $lbtc',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
+          // Show USD estimate only when we have non-zero balance
+          if (ejm != null && ejm != '0' && ejm != '0.00000000') ...[
+            const SizedBox(height: 4),
+            Text(
+              '~\$0.00 USD (price not yet available)',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.4),
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
           if (assets.length > 1) ...[
             const SizedBox(height: 16),
             const Divider(color: Colors.white24),
@@ -327,15 +326,6 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: Colors.white70,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Text(
                     a['ticker'] ?? a['asset_id']?.toString().substring(0, 8) ?? 'Asset',
                     style: const TextStyle(
@@ -392,16 +382,7 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
             Text('Tap to view QR code', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
           ]),
         ),
-        ElevatedButton.icon(
-          onPressed: () => _showReceiveModal(ctx, w),
-          icon: const Icon(Icons.qr_code),
-          label: const Text('Receive'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1B5E20),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
+        // Receive button removed from card — action row below already provides this
       ]),
     );
   }
@@ -492,6 +473,51 @@ class _WalletTabState extends ConsumerState<_WalletTab> {
               ),
             ),
           ]),
+          const SizedBox(height: 12),
+          // ─── FAUCET FUNDING BUTTON (Task B) ───
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3)),
+            ),
+            child: Column(children: [
+              Row(children: [
+                Icon(Icons.water_drop, color: Colors.orange[700], size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  'Need test coins?',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.orange[800]),
+                )),
+              ]),
+              const SizedBox(height: 8),
+              Text(
+                'Tap below to open the Liquid Testnet Faucet and get free L-BTC to test the app.',
+                style: TextStyle(fontSize: 12, color: Colors.orange[700]),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final faucetUrl = 'https://faucet.blockstream.com/liquidtestnet?address=${w.address}';
+                  final uri = Uri.parse(faucetUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else {
+                    await launchUrl(Uri.parse('https://faucet.blockstream.com/liquidtestnet'), mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Icons.water_drop, size: 18),
+                label: const Text('Get Free Test Coins'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF9800),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ]),
+          ),
           const SizedBox(height: 12),
           Row(children: [
             const Icon(Icons.security, size: 16, color: Colors.green),
