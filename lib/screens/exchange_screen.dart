@@ -1,14 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/app_providers.dart';
 
-class ExchangeScreen extends StatefulWidget {
+class ExchangeScreen extends ConsumerStatefulWidget {
   const ExchangeScreen({super.key});
 
   @override
-  State<ExchangeScreen> createState() => _ExchangeScreenState();
+  ConsumerState<ExchangeScreen> createState() => _ExchangeScreenState();
 }
 
-class _ExchangeScreenState extends State<ExchangeScreen> {
+class _ExchangeScreenState extends ConsumerState<ExchangeScreen> {
   int _subTab = 0;
+  List<Map<String, dynamic>> _assets = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssets();
+  }
+
+  Future<void> _loadAssets() async {
+    try {
+      final client = ref.read(apiClientProvider);
+      final assets = await client.listAssets();
+      if (mounted) {
+        setState(() {
+          _assets = assets;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +61,10 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
             onSelectionChanged: (s) => setState(() => _subTab = s.first),
           ),
         ),
-        Expanded(child: IndexedStack(index: _subTab, children: const [
-          _P2PSubTab(),
-          _EscrowSubTab(),
-          _MyOrdersSubTab(),
+        Expanded(child: IndexedStack(index: _subTab, children: [
+          _P2PSubTab(assets: _assets, loading: _loading, error: _error, onRefresh: _loadAssets),
+          const _EscrowSubTab(),
+          const _MyOrdersSubTab(),
         ])),
       ]),
     );
@@ -41,10 +72,28 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
 }
 
 class _P2PSubTab extends StatelessWidget {
-  const _P2PSubTab();
+  final List<Map<String, dynamic>> assets;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRefresh;
+
+  const _P2PSubTab({required this.assets, required this.loading, this.error, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (error != null) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.error_outline, color: Colors.red, size: 48),
+        const SizedBox(height: 12),
+        Text('Error loading assets: $error', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        ElevatedButton(onPressed: onRefresh, child: const Text('Retry')),
+      ]));
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -54,17 +103,12 @@ class _P2PSubTab extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Order Book Preview', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text('Factory Assets', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              _orderRow('SELL', '1,000 ₵', '0.00002000 ₿/₵', 'Okenze'),
-              const Divider(height: 1),
-              _orderRow('BUY', '5,000 ₵', '0.00002100 ₿/₵', 'Chioma'),
-              const Divider(height: 1),
-              _orderRow('SELL', '10,000 ₵', '0.00002250 ₿/₵', 'Emeka'),
-              const Divider(height: 1),
-              _orderRow('BUY', '2,500 ₵', '0.00001950 ₿/₵', 'Ngozi'),
-              const SizedBox(height: 12),
-              Text('Sample data — real order book coming after mainnet launch.', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+              if (assets.isEmpty)
+                const Text('No assets issued yet. Use the Factory to create your first token.', style: TextStyle(color: Colors.grey))
+              else
+                ...assets.map((a) => _assetRow(a)),
             ]),
           ),
         ),
@@ -78,24 +122,21 @@ class _P2PSubTab extends StatelessWidget {
     );
   }
 
-  Widget _orderRow(String side, String amount, String price, String user) {
-    final isSell = side == 'SELL';
+  Widget _assetRow(Map<String, dynamic> asset) {
+    final ticker = asset['ticker'] ?? asset['asset_id']?.toString().substring(0, 8) ?? 'UNKNOWN';
+    final assetId = asset['asset_id'] ?? '-';
+    final balance = asset['balance'] ?? '-';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: isSell ? Colors.red[50] : Colors.green[50],
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(side, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSell ? Colors.red[700] : Colors.green[700])),
+          decoration: BoxDecoration(color: const Color(0xFF1B5E20).withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+          child: Text(ticker, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Text(amount, style: const TextStyle(fontWeight: FontWeight.w600))),
-        Text(price, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-        const SizedBox(width: 12),
-        Text(user, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        Expanded(child: Text(assetId, style: const TextStyle(fontFamily: 'monospace', fontSize: 11), overflow: TextOverflow.ellipsis)),
+        Text('Bal: $balance', style: const TextStyle(fontSize: 12)),
       ]),
     );
   }

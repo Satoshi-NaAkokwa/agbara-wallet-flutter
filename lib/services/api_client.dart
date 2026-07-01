@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/wallet.dart';
-import '../models/asset.dart';
 
 class ApiException implements Exception {
   final String message;

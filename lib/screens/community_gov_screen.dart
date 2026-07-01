@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/app_providers.dart';
 
 class CommunityGovScreen extends ConsumerStatefulWidget {
   const CommunityGovScreen({super.key});
@@ -10,11 +11,35 @@ class CommunityGovScreen extends ConsumerStatefulWidget {
 
 class _CommunityGovScreenState extends ConsumerState<CommunityGovScreen> with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
+  List<Map<String, dynamic>> _assets = [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final client = ref.read(apiClientProvider);
+      final assets = await client.listAssets();
+      if (mounted) {
+        setState(() {
+          _assets = assets;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -39,21 +64,36 @@ class _CommunityGovScreenState extends ConsumerState<CommunityGovScreen> with Si
       ),
       body: TabBarView(
         controller: _tabCtrl,
-        children: const [
-          _CommunityTab(),
-          _GovHeraldTab(),
+        children: [
+          _CommunityTab(assets: _assets, loading: _loading, error: _error, onRefresh: _loadData),
+          _GovHeraldTab(assets: _assets, loading: _loading, error: _error, onRefresh: _loadData),
         ],
       ),
     );
   }
 }
 
-// ─── COMMUNITY TAB: ROSCA / SAVINGS CIRCLES ONLY ───
 class _CommunityTab extends StatelessWidget {
-  const _CommunityTab();
+  final List<Map<String, dynamic>> assets;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRefresh;
+
+  const _CommunityTab({required this.assets, required this.loading, this.error, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.error_outline, color: Colors.red, size: 48),
+        const SizedBox(height: 12),
+        Text('Error: $error', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        ElevatedButton(onPressed: onRefresh, child: const Text('Retry')),
+      ]));
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -80,9 +120,21 @@ class _CommunityTab extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 20),
-        Text('My Groups', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Text('Issued Assets', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        _EmptyState(icon: Icons.groups, message: 'No active groups\nCreate or join a ROSCA to start saving'),
+        if (assets.isEmpty) ...[
+          const _EmptyState(icon: Icons.token, message: 'No assets issued yet\nUse the Factory tab to create your first token'),
+        ] else ...[
+          ...assets.map((a) => Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.token, color: Color(0xFFC8A415)),
+              title: Text(a['ticker'] ?? a['asset_id']?.toString().substring(0, 8) ?? 'Unknown'),
+              subtitle: Text(a['asset_id'] ?? '-', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+              trailing: Text('${a['balance'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          )),
+        ],
         const SizedBox(height: 20),
         Text('How ROSCA Works', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
@@ -109,12 +161,27 @@ class _CommunityTab extends StatelessWidget {
   }
 }
 
-// ─── GOV/HERALD TAB: PROPOSALS + TREASURY ONLY ───
 class _GovHeraldTab extends StatelessWidget {
-  const _GovHeraldTab();
+  final List<Map<String, dynamic>> assets;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRefresh;
+
+  const _GovHeraldTab({required this.assets, required this.loading, this.error, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.error_outline, color: Colors.red, size: 48),
+        const SizedBox(height: 12),
+        Text('Error: $error', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        ElevatedButton(onPressed: onRefresh, child: const Text('Retry')),
+      ]));
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -122,6 +189,20 @@ class _GovHeraldTab extends StatelessWidget {
           'On-chain governance for the Biafran diaspora. Propose, vote, and allocate treasury funds transparently.',
           const Color(0xFF1B5E20)),
         const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Treasury Assets', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              if (assets.isEmpty)
+                const Text('No assets in treasury.', style: TextStyle(color: Colors.grey))
+              else
+                ...assets.map((a) => _governanceCard(context, a['asset_id'] ?? '-', a['ticker'] ?? 'Unknown', 'Active', a['balance'] ?? '0')),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 20),
         _governanceCard(context, 'EJM-001', 'Adopt Ofo-based identity verification', 'Open', '72% Yes'),
         const SizedBox(height: 10),
         _governanceCard(context, 'EJM-002', 'Lower remittance fees to 0.1%', 'Voting ends tomorrow', '58% Yes'),
@@ -208,7 +289,6 @@ class _GovHeraldTab extends StatelessWidget {
   }
 }
 
-// ─── SHARED HELPERS ───
 Widget _buildInfoCard(BuildContext ctx, IconData icon, String title, String subtitle, Color color) {
   return Card(
     color: color.withOpacity(0.05),
