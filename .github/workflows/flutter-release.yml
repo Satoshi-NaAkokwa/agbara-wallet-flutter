@@ -106,6 +106,7 @@ jobs:
 
   build-ios:
     name: Build iOS IPA
+    if: false  # iOS signing certificates not configured; skip for now
     runs-on: macos-latest
     steps:
       - name: Checkout
