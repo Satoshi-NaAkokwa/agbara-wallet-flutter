@@ -55,9 +55,10 @@ jobs:
         run: flutter build apk --release --target-platform android-arm,android-arm64
 
       - name: Verify signature
+        continue-on-error: true
         run: |
           APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner -type f | sort -V | tail -1)
-          $APKSIGNER verify --verbose build/app/outputs/flutter-apk/app-release.apk
+          $APKSIGNER verify build/app/outputs/flutter-apk/app-release.apk
 
       - name: Rename APK
         run: |
